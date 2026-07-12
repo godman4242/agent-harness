@@ -13,6 +13,7 @@ setup from an elite one. Each is one page and optional; adopt them one at a time
 | [`nested-context.md`](nested-context.md) | Codebase the agent keeps mis-navigating | Folder-local rule files, auto-loaded where the work happens |
 | [`crash-resilience.md`](crash-resilience.md) | Heavy/long sessions that might get cut off | Session log first · commit docs early · record run-IDs + resume commands at launch |
 | [`maintenance-rot.md`](maintenance-rot.md) | Setup older than a model release | ROT ledger with per-layer review dates · scheduled prune pass · dated corrections |
+| [`proof-discipline.md`](proof-discipline.md) | Long builds where "looks right" ≠ "is right" | Binary gates + pasted evidence · red-first + chaos-proofs · pins/ratchets · refuter-verified audits · dev-seam verification |
 
 **Where these sit:** Level 5 in [`../SETUP-LEVELS.md`](../SETUP-LEVELS.md). They assume you already have
 Levels 1–2 (a profile + enforcement); memory (Level 3) and the commit gate (Level 4) make them sharper
