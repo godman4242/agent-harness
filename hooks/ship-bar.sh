@@ -18,6 +18,7 @@ Before ending this turn, make sure you did all of these:
    asked the user only about destructive / money / irreversible actions.
 4. Verified before claiming "done / fixed / passing" — pasted real evidence, never just asserted it.
 5. Ended with numbered next steps, each with a plain-English VERIFY — or the line "Nothing for you to do."
-6. Bounded improvement: one solid pass, then stop at churn. Don't gold-plate.
+6. Bounded improvement: one solid pass, then stop at churn. Don't gold-plate. Prefer the simplest change that solves it — delete over add, no speculative abstractions or future-proofing beyond what's asked.
+7. Stuck-stop: after 2 failed attempts at the same problem, stop — summarize what you tried and the evidence, then ask. Don't keep trying variations; the next attempt must be a fundamentally different approach or a halt.
 </work-ethic-contract>
 CONTRACT
