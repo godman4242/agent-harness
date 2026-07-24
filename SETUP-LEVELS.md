@@ -45,7 +45,7 @@ into your profile so the agent reads and writes it.
 **What:** the process habits that separate good from elite — a planning framework, lean session
 kickoffs, folder-local rules (nested `CLAUDE.md`), and a handoff routine so long work survives a
 context reset.
-**Do:** [`playbooks/README.md`](playbooks/README.md) — five one-page habits; adopt one at a time.
+**Do:** [`playbooks/README.md`](playbooks/README.md) — one-page habits; adopt one at a time.
 
 ---
 

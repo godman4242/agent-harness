@@ -195,6 +195,12 @@ because the product *is* low cognitive load, so "add everything" would betray it
   one-command `install.sh` (Levels 1–2, safe + idempotent, end-to-end tested against a throwaway HOME),
   and two more archetypes (`beginner`, `senior-fast-shipper`). Each held to the one-page / one-command
   bar. Playbooks were distilled from real process docs and **generalized** — no author/project specifics.
+- **v4.1 (2026-07):** +3 playbooks — `crash-resilience` (survive context/usage cut-offs), `maintenance-rot`
+  (a rot ledger + prune pass), `proof-discipline` (binary gates + pasted evidence for long builds).
+- **v4.2 (2026-07):** +2 playbooks — `divergent-thinking` (run distorted "frames" before converging on an
+  open-ended fork; frames adapted from the MIT-licensed ADHD reasoning framework) and `tool-triage`
+  (before adopting any tool: overlap → the one novel nugget → standing cost; take the idea, skip the
+  sprawl). Same one-page / generalized bar; brittle playbook counts elsewhere made count-proof.
 
 ## 9. Sources
 
