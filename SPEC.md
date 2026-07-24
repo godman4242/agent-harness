@@ -201,6 +201,9 @@ because the product *is* low cognitive load, so "add everything" would betray it
   open-ended fork; frames adapted from the MIT-licensed ADHD reasoning framework) and `tool-triage`
   (before adopting any tool: overlap → the one novel nugget → standing cost; take the idea, skip the
   sprawl). Same one-page / generalized bar; brittle playbook counts elsewhere made count-proof.
+- **v4.3 (2026-07):** +`decision-hygiene` playbook — for a consequential, hard-to-reverse choice:
+  steelman the alternative → red-team your own pick → check ordering → show both. Pairs with
+  `proof-discipline` (verify you did it right) and `planning`'s stop-rule (when to abandon it).
 
 ## 9. Sources
 

@@ -66,7 +66,7 @@ memory/                    ← give the agent continuity across sessions (Level 
   MEMORY.md                ← the session-start index (starts empty)
   memory-file.template.md  ← copy to record one fact
 commit-gate/               ← "done = green": a pre-commit gate template (Level 4)
-playbooks/                 ← process habits: planning · divergent-thinking · feature-workflow · kickoff · handoff · nested-context · crash-resilience · maintenance-rot · tool-triage · proof-discipline (Level 5)
+playbooks/                 ← process habits: planning · divergent-thinking · decision-hygiene · feature-workflow · kickoff · handoff · nested-context · crash-resilience · maintenance-rot · tool-triage · proof-discipline (Level 5)
 hooks/
   ship-bar.sh              ← re-injects your standing rules every turn (enforcement)
   settings-snippet.json    ← the Claude Code settings block that wires the hook

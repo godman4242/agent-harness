@@ -8,6 +8,7 @@ setup from an elite one. Each is one page and optional; adopt them one at a time
 |---|---|---|
 | [`planning.md`](planning.md) | Deciding what to work on | 🧭 Compass says NO · 🔭 Explore · ⚙️ Execute · 🔁 tight loops + stop-rule |
 | [`divergent-thinking.md`](divergent-thinking.md) | An open-ended fork with many options | Run 3–4 distorted **frames**, show labelled options, then prune to one |
+| [`decision-hygiene.md`](decision-hygiene.md) | A consequential, hard-to-reverse choice | Steelman the alt · red-team your pick · check ordering · show both |
 | [`feature-workflow.md`](feature-workflow.md) | Building something non-trivial | Two modes; **plan → research → implement** (not research-first) |
 | [`session-kickoff.md`](session-kickoff.md) | Starting a work session | Paste a lean kickoff: read-first, what-not-to-break, prove-it, first action |
 | [`handoff.md`](handoff.md) | Stopping / running low on context | A "resume here" snapshot, refreshed in the same commit as the change |
