@@ -72,7 +72,9 @@ mkdir -p ~/.claude/workflows && ln -sfn "$PWD/harness/workflows/measure-refute.j
 test -e ~/.claude/workflows/measure-refute.js && echo installed   # a dangling link fails here
 ```
 
-Start a new Claude Code session (workflows are registered at session start), then in any project:
+Start a new Claude Code session, then in any project. (A session loads each named workflow's *content*
+when it starts and keeps running that copy even if you edit the file — test an edit with
+`Workflow({ scriptPath: '<path>/measure-refute.js', args })`, or from a new session.)
 
 ```js
 Workflow({ name: 'measure-refute', args: {
