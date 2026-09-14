@@ -1,5 +1,5 @@
 // Executes measure-refute.js against stub agents — every agent DEAD, every agent ALIVE —
-// and pins the fail-closed accounting. Zero dependencies:  node --test harness/
+// and pins the fail-closed accounting. Zero dependencies:  node --test 'harness/**/*.test.mjs'
 //
 // A workflow script uses a top-level `return`, so `node --check` rejects it; it is compiled
 // here the way the runtime compiles it, as the body of an async function.
@@ -21,7 +21,8 @@ const ARGS = {
 async function run(args, answer) {
   const labels = []
   const agent = async (_prompt, opts) => { labels.push(opts.label); return answer(opts.label) }
-  const parallel = async (thunks) => Promise.all(thunks.map((t) => t()))
+  // As the runtime does it: a thunk that THROWS resolves to null; the call itself never rejects.
+  const parallel = async (thunks) => Promise.all(thunks.map((t) => Promise.resolve().then(t).catch(() => null)))
   // As the runtime does it: a stage that THROWS drops that item to null.
   const pipeline = async (items, ...stages) => {
     const out = []
@@ -97,4 +98,56 @@ test('no units or no lenses: zero agents, UNVERIFIED, and it says why', async ()
     assert.equal(result.fatalCount, null)
     assert.match(result.integrity, /Nothing was checked/)
   }
+})
+
+test('malformed args spawn NOTHING and say what is wrong — plain strings must not run as `undefined`', async () => {
+  const cases = [
+    ['a JSON string', JSON.stringify(ARGS), /args must be an object/],
+    ['string units', { ...ARGS, units: ['a.ts', 'b.ts'] }, /units\[0\] must be \{ name, read\?, focus\? \}/],
+    ['string lenses', { ...ARGS, lenses: ['spec'] }, /lenses\[0\] must be \{ key, ask \}/],
+    ['a unit with no name', { ...ARGS, units: [{ read: ['a.ts'] }] }, /units\[0\]\.name/],
+    ['read is not a list of paths', { ...ARGS, units: [{ name: 'a', read: 'a.ts' }] }, /units\[0\]\.read/],
+    ['a lens with no ask', { ...ARGS, lenses: [{ key: 'x' }] }, /lenses\[0\]\.ask/],
+    ['duplicate unit names', { ...ARGS, units: [{ name: 'a' }, { name: 'a' }] }, /duplicate unit name 'a'/],
+    ['duplicate lens keys', { ...ARGS, lenses: [{ key: 'x', ask: '?' }, { key: 'x', ask: '?' }] }, /duplicate lens key 'x'/],
+  ]
+  for (const [what, args, why] of cases) {
+    const { result, labels } = await run(args, () => { throw new Error('no agent may spawn') })
+    assert.equal(labels.length, 0, what)
+    assert.equal(result.status, 'UNVERIFIED', what)
+    assert.equal(result.fatalCount, null, what)
+    assert.match(result.integrity, why, what)
+  }
+})
+
+test('only CLEAN, CORRECTED and FATAL are live — a malformed or mis-cased verdict is NOT a pass', async () => {
+  for (const bad of [{ verdict: 'unverified' }, { refutations: [] }, 'CLEAN', { verdict: 'PASS' }]) {
+    const { result } = await run(ARGS, (l) => (l.startsWith('measure') ? measured(l) : l === 'refute:a:x' ? bad : { verdict: 'CLEAN', refutations: [], integrity: '' }))
+    assert.equal(result.status, 'UNVERIFIED', JSON.stringify(bad))
+    assert.equal(result.fatalCount, null, JSON.stringify(bad))
+    assert.match(result.integrity, /5\/6 live verdicts.*1 UNVERIFIED/)
+  }
+})
+
+test('a refuter that THROWS is still named in the result, UNVERIFIED — not a bare null', async () => {
+  const { result } = await run(ARGS, (l) => {
+    if (l.startsWith('measure')) return measured(l)
+    if (l === 'refute:c:y') throw new Error('budget ceiling')
+    return { verdict: 'CLEAN', refutations: [], integrity: '' }
+  })
+  const c = result.units.find((u) => u.unit === 'c')
+  assert.deepEqual(c.verdicts.map((v) => [v.lens, v.verdict]), [['x', 'CLEAN'], ['y', 'UNVERIFIED']])
+  assert.equal(result.fatalCount, null)
+  assert.match(result.integrity, /5\/6 live verdicts.*1 UNVERIFIED/)
+})
+
+test('a measure agent that THROWS leaves the unit UNMEASURED with every lens named UNVERIFIED', async () => {
+  const { result } = await run(ARGS, (l) => {
+    if (l === 'measure:a') throw new Error('budget ceiling')
+    return l.startsWith('measure') ? measured(l) : { verdict: 'CLEAN', refutations: [], integrity: '' }
+  })
+  const a = result.units.find((u) => u.unit === 'a')
+  assert.equal(a.status, 'UNMEASURED')
+  assert.deepEqual(a.verdicts.map((v) => [v.lens, v.verdict]), [['x', 'UNVERIFIED'], ['y', 'UNVERIFIED']])
+  assert.match(result.integrity, /2\/3 units measured; 4\/6 live verdicts.*2 UNVERIFIED/)
 })

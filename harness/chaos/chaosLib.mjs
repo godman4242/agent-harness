@@ -4,6 +4,7 @@
 // cannot import it without running it. These functions carry every decision that could
 // be wrong in a way that makes a broken plant look like a caught one, and
 // `chaosLib.test.mjs` pins each of them.
+import { posix } from 'node:path'
 
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
 
@@ -12,54 +13,72 @@ const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
  * presets; anything else is configured as `{ failed: '<regex>', passed: '<regex>' }`, each
  * with one capture group. Guessing a format and shipping it as a preset would be the exact
  * unverified claim this tool exists to catch.
+ *
+ * Every parser takes the LAST match: the summary is the last thing a runner prints, and a
+ * test is free to log a line that looks like one.
  */
 export const SUMMARY_PRESETS = {
   // `Tests  2 failed | 5 passed (7)` — read off the `Tests` LINE only, so a test name or a
   // stack trace containing "1 failed" cannot feed the gate a number.
   vitest(out) {
-    const line = /^\s*Tests\s+(.*)$/m.exec(out)?.[1]
-    if (line === undefined) return { failed: null, passed: null }
-    return { failed: num(/(\d+)\s+failed/.exec(line)), passed: num(/(\d+)\s+passed/.exec(line)) }
+    const line = last(/^\s*(Tests\s+.*)$/gm, out)
+    if (line === null) return { failed: null, passed: null, evidence: [] }
+    return { failed: num(/(\d+)\s+failed/.exec(line[1])), passed: num(/(\d+)\s+passed/.exec(line[1])), evidence: [line[1].trim()] }
   },
   // node:test — the spec reporter (`ℹ fail 1`) and the TAP reporter (`# fail 1`).
   node(out) {
-    return {
-      failed: num(/^(?:ℹ|#) fail (\d+)\s*$/m.exec(out)),
-      passed: num(/^(?:ℹ|#) pass (\d+)\s*$/m.exec(out)),
-    }
+    const failed = last(/^(?:ℹ|#) fail (\d+)\s*$/gm, out)
+    const passed = last(/^(?:ℹ|#) pass (\d+)\s*$/gm, out)
+    return { failed: num(failed), passed: num(passed), evidence: [failed, passed].filter(Boolean).map((m) => m[0].trim()) }
   },
+}
+
+function last(regex, text) {
+  let found = null
+  for (const m of text.matchAll(regex)) found = m
+  return found
 }
 
 function num(match) {
   return match === null || match === undefined ? null : Number(match[1])
 }
 
-/** The counts a run reported, or `null` where it reported none. ANSI colour is stripped first. */
+/**
+ * The counts a run reported (`null` where it reported none), their sum as `total`, and the
+ * summary text they were read from as `evidence` — printed beside every verdict, because a
+ * probe whose parser matched nothing has not passed. ANSI colour is stripped first.
+ */
 export function testCounts(summary, out) {
   const clean = out.replace(ANSI, '')
+  let counts
   if (typeof summary === 'string') {
     const preset = SUMMARY_PRESETS[summary]
     if (preset === undefined) throw new Error(`unknown summary preset '${summary}' (known: ${Object.keys(SUMMARY_PRESETS).join(', ')})`)
-    return preset(clean)
+    counts = preset(clean)
+  } else {
+    const failed = last(new RegExp(summary.failed, 'gm'), clean)
+    const passed = last(new RegExp(summary.passed, 'gm'), clean)
+    counts = { failed: num(failed), passed: num(passed), evidence: [failed, passed].filter(Boolean).map((m) => m[0].trim()) }
   }
-  return {
-    failed: num(new RegExp(summary.failed, 'm').exec(clean)),
-    passed: num(new RegExp(summary.passed, 'm').exec(clean)),
-  }
+  const { failed, passed, evidence } = counts
+  return { failed, passed, total: (failed ?? 0) + (passed ?? 0), evidence: evidence.length > 0 ? evidence.join(' · ') : '(no summary matched)' }
 }
 
 /**
- * How one planted run reads.
- *  · `red`          — at least one test FAILED. The only passing outcome for a plant.
- *  · `green`        — the run passed: nothing covers the guard. A MISSING TEST.
- *  · `inconclusive` — non-zero exit with no failed test reported: usually a plant that broke
- *                     the build, which proves nothing about the test meant to catch it.
+ * How one planted run reads, against the unplanted run of the same tests.
+ *  · `red`          — a non-zero exit, at least one FAILED test, and the same number of tests
+ *                     as the baseline. The only passing outcome for a plant.
+ *  · `green`        — a clean exit with no failed test: nothing covers the guard. A MISSING TEST.
+ *  · `inconclusive` — anything else. A plant that breaks the build, or stops a test file from
+ *                     LOADING, makes some runners count the file as one failed "test" — so the
+ *                     total drops, and that is not a catch. Neither is a "failure" with exit 0.
  * "Any non-zero exit is red" is the tempting rule, and it counts a broken compile as a catch.
  */
-export function classify(summary, code, out) {
-  const { failed } = testCounts(summary, out)
-  if (failed !== null && failed > 0) return 'red'
-  if (code === 0) return 'green'
+export function classify(summary, code, out, baselineTotal) {
+  const { failed, total } = testCounts(summary, out)
+  const anyFailed = failed !== null && failed > 0
+  if (code !== 0 && anyFailed && total === baselineTotal) return 'red'
+  if (code === 0 && !anyFailed) return 'green'
   return 'inconclusive'
 }
 
@@ -73,23 +92,31 @@ export function baselineIsGreen(summary, code, out) {
   return code === 0 && (failed === null || failed === 0) && passed !== null && passed > 0
 }
 
+/** Every occurrence, OVERLAPPING ones included — `}\n}` occurs twice in `}\n}\n}`. */
 export function countOccurrences(haystack, needle) {
-  return haystack.split(needle).length - 1
+  let n = 0
+  for (let i = haystack.indexOf(needle); i !== -1; i = haystack.indexOf(needle, i + 1)) n++
+  return n
 }
 
 /**
  * `text` with the plant applied. Throws unless the anchor occurs EXACTLY ONCE — zero means the
- * source moved under the plant, two means it is ambiguous — and throws if the substitution
- * changes nothing: a plant that does not mutate proves nothing.
+ * source moved under the plant, two means it is ambiguous. The replacement is inserted
+ * literally: as a plain string, `$&` / `$1` / `$$` would be String.replace patterns.
  */
 export function applyPlant(text, plant) {
   const occurrences = countOccurrences(text, plant.find)
   if (occurrences !== 1) {
     throw new Error(`anchor occurs ${occurrences}× in ${plant.file}, expected exactly 1 — re-anchor the plant`)
   }
-  const mutated = text.replace(plant.find, () => plant.replace)
-  if (mutated === text) throw new Error(`the substitution left ${plant.file} unchanged`)
-  return mutated
+  return text.replace(plant.find, () => plant.replace)
+}
+
+/** Lines in a run's output that name a failing test (node spec ✖, TAP `not ok`, vitest ×, Jest ●). */
+export function failingTestLines(out) {
+  const lines = out.replace(ANSI, '').split('\n').map((l) => l.trim())
+  const hits = lines.filter((l) => /^(✖|×|●|not ok\b)/.test(l) && l !== '✖ failing tests:')
+  return [...new Set(hits)].slice(0, 5)
 }
 
 /**
@@ -109,6 +136,12 @@ export function validatePlant(raw, where) {
   if (typeof raw.replace !== 'string') throw new Error(`${where}: 'replace' must be a string`)
   const plant = { name: str('name'), file: str('file'), find: str('find'), replace: raw.replace, tests: [...raw.tests], note: str('note') }
   if (plant.find === plant.replace) throw new Error(`${where} (${plant.name}): 'find' and 'replace' are identical`)
+  const inside = (p) => !posix.isAbsolute(p) && !posix.normalize(p).startsWith('../')
+  if (![plant.file, ...plant.tests].every(inside)) throw new Error(`${where} (${plant.name}): every path must be relative and inside the project`)
+  // A plant that mutates its own test breaks the assertion, not the guard, and reads RED.
+  if (plant.tests.some((t) => posix.normalize(t) === posix.normalize(plant.file))) {
+    throw new Error(`${where} (${plant.name}): '${plant.file}' is one of its own test files — a plant breaks source, not the test`)
+  }
   return plant
 }
 
@@ -125,6 +158,21 @@ export function validateConfig(raw) {
     if (!(summary in SUMMARY_PRESETS)) throw new Error(`chaos.config.json: unknown summary preset '${summary}' (known: ${Object.keys(SUMMARY_PRESETS).join(', ')})`)
   } else if (typeof summary !== 'object' || summary === null || typeof summary.failed !== 'string' || typeof summary.passed !== 'string') {
     throw new Error("chaos.config.json: 'summary' must be a preset name or { \"failed\": \"<regex>\", \"passed\": \"<regex>\" }")
+  } else {
+    for (const key of ['failed', 'passed']) {
+      try {
+        new RegExp(summary[key], 'gm')
+      } catch (err) {
+        throw new Error(`chaos.config.json: summary.${key} is not a valid regex — ${err.message}`)
+      }
+    }
   }
   return { plantsDir, expectedTotal, testCommand, summary }
+}
+
+/** The command line. Anything that looks like an option and is not one is refused, never ignored. */
+export function parseArgs(argv) {
+  const unknown = argv.filter((a) => a.startsWith('-') && a !== '--list' && a !== '--check')
+  if (unknown.length > 0) throw new Error(`unknown option ${unknown.join(' ')} — the options are --check and --list (anything else is a name filter)`)
+  return { list: argv.includes('--list'), check: argv.includes('--check'), filters: argv.filter((a) => !a.startsWith('-')) }
 }

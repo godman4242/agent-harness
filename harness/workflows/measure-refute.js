@@ -3,7 +3,8 @@
  *
  * One agent MEASURES each unit (reads its files first-hand and reports claims with
  * evidence); then one adversarial agent per LENS per unit tries to REFUTE that
- * measurement. Nothing writes. The calling session owns every edit.
+ * measurement. Agents are INSTRUCTED to write nothing — the prompt enforces that, nothing else
+ * does (they run as the default workflow subagent). The calling session owns every edit.
  *
  * Install once, available in every project (a user-level workflow registers by name — and a
  * symlink registers and runs, measured), from this repo's root:
@@ -28,9 +29,13 @@
  *   · zero live verifiers for a unit   ⇒ UNVERIFIED, never CLEAN;
  *   · ANY dead verifier in the run     ⇒ top-level status UNVERIFIED and fatalCount NULL —
  *                                        never a 0 a caller can read as clean;
- *   · no units or no lenses given      ⇒ zero agents, status UNVERIFIED, and it says why.
- * `measure-refute.test.mjs` (beside this file) executes it with every agent dead and every
- * agent alive and pins all four.
+ *   · an agent that THROWS             ⇒ the same as one that died, still named by unit and lens;
+ *   · a verdict that is not exactly CLEAN, CORRECTED or FATAL ⇒ not live (an allow-list, never
+ *                                        "anything but UNVERIFIED");
+ *   · missing or malformed args        ⇒ zero agents, status UNVERIFIED, and it says what is wrong —
+ *                                        a unit passed as a plain string must not run as `undefined`.
+ * `measure-refute.test.mjs` (beside this file) executes it with agents dead, throwing, malformed
+ * and alive, and pins every one of these.
  *
  * What is NOT reproducible: two runs over the same inputs can raise different true
  * findings. Report the findings a run raises; gate only on the accounting.
@@ -46,20 +51,51 @@ export const meta = {
   ],
 }
 
-const cfg = args ?? {}
-const UNITS = Array.isArray(cfg.units) ? cfg.units : []
-const LENSES = Array.isArray(cfg.lenses) ? cfg.lenses : []
-const expected = UNITS.length * LENSES.length
+/** Every way the args can be wrong, in words. Checked before a single agent is spawned. */
+function argProblems(a) {
+  if (typeof a !== 'object' || a === null || Array.isArray(a)) return [`args must be an object { goal, units, lenses }, got ${Array.isArray(a) ? 'an array' : typeof a}`]
+  const nonEmpty = (v) => typeof v === 'string' && v.trim().length > 0
+  const problems = []
+  if (!Array.isArray(a.units) || a.units.length === 0) problems.push('args.units must be a non-empty array')
+  if (!Array.isArray(a.lenses) || a.lenses.length === 0) problems.push('args.lenses must be a non-empty array')
+  const seen = { unit: new Set(), lens: new Set() }
+  ;(Array.isArray(a.units) ? a.units : []).forEach((u, i) => {
+    if (typeof u !== 'object' || u === null) return problems.push(`units[${i}] must be { name, read?, focus? }, got ${JSON.stringify(u)}`)
+    if (!nonEmpty(u.name)) problems.push(`units[${i}].name must be a non-empty string`)
+    else if (seen.unit.has(u.name)) problems.push(`duplicate unit name '${u.name}'`)
+    else seen.unit.add(u.name)
+    if (u.read !== undefined && (!Array.isArray(u.read) || !u.read.every(nonEmpty))) problems.push(`units[${i}].read must be an array of paths`)
+    if (u.focus !== undefined && typeof u.focus !== 'string') problems.push(`units[${i}].focus must be a string`)
+  })
+  ;(Array.isArray(a.lenses) ? a.lenses : []).forEach((l, i) => {
+    if (typeof l !== 'object' || l === null) return problems.push(`lenses[${i}] must be { key, ask }, got ${JSON.stringify(l)}`)
+    if (!nonEmpty(l.key)) problems.push(`lenses[${i}].key must be a non-empty string`)
+    else if (seen.lens.has(l.key)) problems.push(`duplicate lens key '${l.key}'`)
+    else seen.lens.add(l.key)
+    if (!nonEmpty(l.ask)) problems.push(`lenses[${i}].ask must be a non-empty string`)
+  })
+  return problems
+}
 
-if (UNITS.length === 0 || LENSES.length === 0) {
-  log('measure-refute: no units or no lenses in args — spawned nothing')
+const problems = argProblems(args)
+if (problems.length > 0) {
+  log(`measure-refute: bad args — spawned nothing: ${problems.join('; ')}`)
   return {
     status: 'UNVERIFIED',
     fatalCount: null,
-    integrity: `0 agents spawned: args needs units (${UNITS.length}) and lenses (${LENSES.length}). Nothing was checked.`,
+    integrity: `0 agents spawned. Nothing was checked. ${problems.join('; ')}`,
     units: [],
   }
 }
+
+const cfg = args
+const UNITS = cfg.units
+const LENSES = cfg.lenses
+const expected = UNITS.length * LENSES.length
+// An ALLOW-list: a verdict is live only if it is one of these exact strings.
+const LIVE = new Set(['CLEAN', 'CORRECTED', 'FATAL'])
+const isLive = (v) => typeof v === 'object' && v !== null && LIVE.has(v.verdict)
+const unverified = (lens, why) => ({ lens, verdict: 'UNVERIFIED', refutations: [], integrity: why })
 
 const READONLY = `
 ⛔ READ-ONLY. Write, edit or delete NOTHING, and run no command that changes state (no git
@@ -151,34 +187,35 @@ CORRECTED (claims stand but need listed fixes) · CLEAN (you RAN real checks and
 phase('Measure')
 const results = await pipeline(
   UNITS,
-  (unit) => agent(measurePrompt(unit), { label: `measure:${unit.name}`, phase: 'Measure', schema: MEASURE_SCHEMA }),
+  // The runtime's agent() returns null when an agent dies and THROWS in other cases (a budget
+  // ceiling); both are caught here so neither can drop a unit or a lens name.
+  (unit) => agent(measurePrompt(unit), { label: `measure:${unit.name}`, phase: 'Measure', schema: MEASURE_SCHEMA }).catch(() => null),
   (measured, unit) => {
-    if (!measured) {
-      return {
-        unit: unit.name,
-        status: 'UNMEASURED',
-        verdicts: LENSES.map((l) => ({ lens: l.key, verdict: 'UNVERIFIED', refutations: [], integrity: 'the measure agent returned nothing' })),
-      }
+    if (typeof measured !== 'object' || measured === null) {
+      return { unit: unit.name, status: 'UNMEASURED', verdicts: LENSES.map((l) => unverified(l.key, 'the measure agent returned nothing or threw')) }
     }
     return parallel(
-      LENSES.map((lens) => () =>
-        agent(refutePrompt(unit, lens, measured), { label: `refute:${unit.name}:${lens.key}`, phase: 'Refute', schema: VERDICT_SCHEMA })
-          .then((v) => ({ lens: lens.key, ...(v ?? { verdict: 'UNVERIFIED', refutations: [], integrity: 'the refute agent died — fail-closed' }) })),
-      ),
-    ).then((verdicts) => ({
-      unit: unit.name,
-      status: verdicts.some((v) => v && v.verdict !== 'UNVERIFIED') ? 'VERIFIED' : 'UNVERIFIED',
-      measured,
-      verdicts,
-    }))
+      LENSES.map((lens) => async () => {
+        try {
+          const v = await agent(refutePrompt(unit, lens, measured), { label: `refute:${unit.name}:${lens.key}`, phase: 'Refute', schema: VERDICT_SCHEMA })
+          return isLive(v) ? { ...v, lens: lens.key } : unverified(lens.key, `the refute agent died or returned no valid verdict: ${JSON.stringify(v)}`)
+        } catch (err) {
+          return unverified(lens.key, `the refute agent threw: ${err instanceof Error ? err.message : String(err)}`)
+        }
+      }),
+    ).then((verdicts) => {
+      // parallel() never rejects, but it turns a thunk that threw into null — keep the lens name.
+      const named = LENSES.map((l, i) => verdicts[i] ?? unverified(l.key, 'lost by parallel()'))
+      return { unit: unit.name, status: named.some(isLive) ? 'VERIFIED' : 'UNVERIFIED', measured, verdicts: named }
+    })
   },
 )
 
 // A null here is a unit that fell out of the run entirely — it must not look like a pass.
-const byUnit = UNITS.map((u, i) => results[i] ?? { unit: u.name, status: 'UNMEASURED', verdicts: [] })
+const byUnit = UNITS.map((u, i) => results[i] ?? { unit: u.name, status: 'UNMEASURED', verdicts: LENSES.map((l) => unverified(l.key, 'the unit fell out of the run')) })
 const verdicts = byUnit.flatMap((u) => u.verdicts)
-const live = verdicts.filter((v) => v && v.verdict !== 'UNVERIFIED')
-const fatal = verdicts.filter((v) => v && v.verdict === 'FATAL')
+const live = verdicts.filter(isLive)
+const fatal = live.filter((v) => v.verdict === 'FATAL')
 const complete = live.length === expected
 const measuredCount = byUnit.filter((u) => u.status !== 'UNMEASURED').length
 
@@ -188,6 +225,6 @@ return {
   status: complete ? 'VERIFIED' : 'UNVERIFIED',
   // Null unless EVERY verdict is live: a dead run must never report the 0 a clean run reports.
   fatalCount: complete ? fatal.length : null,
-  integrity: `${measuredCount}/${UNITS.length} units measured; ${live.length}/${expected} live verdicts (${LENSES.length} lenses × ${UNITS.length} units); ${fatal.length} FATAL; ${verdicts.length - live.length} UNVERIFIED. A unit or lens missing from the counts DIED — it was not clean.`,
+  integrity: `${measuredCount}/${UNITS.length} units measured; ${live.length}/${expected} live verdicts (${LENSES.length} lenses × ${UNITS.length} units); ${fatal.length} FATAL; ${expected - live.length} UNVERIFIED. A unit or lens missing from the counts DIED — it was not clean.`,
   units: byUnit,
 }
