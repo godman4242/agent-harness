@@ -1,0 +1,6 @@
+{
+  "plantsDir": "plants",
+  "expectedTotal": 33,
+  "testCommand": ["node", "--test"],
+  "summary": "node"
+}

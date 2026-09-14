@@ -22,6 +22,8 @@
 BUILD_CMD="npm run build"
 TEST_CMD="npm test"
 LINT_CMD="npm run lint"
+#    Level 6 (optional): the chaos runner's NO-mutation half. Never the full gate — it rewrites source.
+CHAOS_CHECK_CMD=""   # e.g. "node scripts/chaos/chaos.mjs --check"
 #    Other stacks — replace the three lines above with yours, e.g.:
 #      Python:  BUILD_CMD=""            TEST_CMD="pytest -q"        LINT_CMD="ruff check ."
 #      Rust:    BUILD_CMD="cargo build" TEST_CMD="cargo test"      LINT_CMD="cargo clippy -- -D warnings"
@@ -58,6 +60,7 @@ printf '\n[gate] build → tests → lint (bypass with --no-verify)\n\n'
 run_step build "$BUILD_CMD"
 run_step tests "$TEST_CMD"
 run_step lint  "$LINT_CMD"
+run_step chaos-check "$CHAOS_CHECK_CMD"
 printf '\n✅ Gate passed — committing.\n\n'
 
 # Optional: to auto-stage everything before the gate (opinionated — it commits

@@ -52,10 +52,10 @@ context reset.
 test that can fail, and a read-only **verification workflow** checks what the docs claim against the
 code — with accounting that can't mistake a crashed check for a clean one. (Skip if you're not
 writing code.)
-**Do:** [`harness/README.md`](harness/README.md) — copy one config, write one plant per guard, add
-`--check` to your commit gate.
-**You now get:** a guard with no test goes red instead of shipping, and "0 problems found" means the
-check actually ran.
+**Do:** [`harness/README.md`](harness/README.md) — vendor two files, copy one config, write one plant
+per guard, add `--check` to your commit gate.
+**You now get:** a guard with a plant but no test goes red the next time you run the gate, `--check`
+in pre-commit keeps the plants from rotting, and "0 problems found" means the check actually ran.
 
 ---
 

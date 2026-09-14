@@ -1,5 +1,5 @@
 {
-  "plantsDir": "tests",
+  "plantsDir": "chaos",
   "expectedTotal": 1,
   "testCommand": ["npx", "vitest", "run"],
   "summary": "vitest"

@@ -8,7 +8,7 @@
 #
 # Safe & idempotent: it BACKS UP anything it changes (.bak) and never blindly
 # overwrites your existing CLAUDE.md or settings.json. Re-running it is a no-op.
-# Memory (L3), the commit gate (L4) and playbooks (L5) are per-project — this
+# Memory (L3), the commit gate (L4), playbooks (L5) and the harness (L6) are per-project — this
 # prints how to add them at the end. See SETUP-LEVELS.md.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -92,4 +92,5 @@ Next levels (per project — see SETUP-LEVELS.md):
    • L3 memory      → copy this repo's memory/ into your project + paste the wire-in from memory/README.md
    • L4 commit gate → commit-gate/README.md  (30-second copy)
    • L5 playbooks   → playbooks/README.md
+   • L6 harness     → harness/README.md  (coding projects)
 EOF

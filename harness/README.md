@@ -13,46 +13,81 @@ into two committed tools and adds the rules they earned.
 ## Tool 1 — chaos plants: [`chaos/`](chaos/)
 
 A **plant** is a deliberate one-line break in your source — "delete this guard" — declared as data
-and committed. The runner applies each plant, runs the tests it names, requires at least one
-**failed test**, and puts the file back byte-for-byte. A plant that stays green is a missing test.
+and committed. The runner applies each plant, runs the tests it names, requires a **failed test**,
+and puts the file back byte-for-byte. A plant that stays green is a missing test.
 
-1. Copy [`chaos/chaos.config.example.json`](chaos/chaos.config.example.json) to your project root as
-   `chaos.config.json`. `summary` is `"vitest"`, `"node"` (node:test), or two regexes for any other
-   runner: `{ "failed": "Tests:\\s+(\\d+) failed", "passed": "(\\d+) passed" }`.
-2. Write plants in `*.plants.mjs` files — one per guard. The format is
-   [`chaos/example.plants.mjs`](chaos/example.plants.mjs).
-3. **The gate** (before you call a feature done): `node <this-repo>/harness/chaos/chaos.mjs`
-4. **Pre-commit** (never the full gate — it rewrites source): `node <this-repo>/harness/chaos/chaos.mjs --check`
-   resolves every anchor and pins the count without touching a file.
+**Needs:** Node 22+ (the suite passes on 22.23, 24.20 and 26.8) and a git repo with the files you plant into committed. No dependencies.
+
+1. **Vendor the runner.** Copy [`chaos/chaos.mjs`](chaos/chaos.mjs) **and**
+   [`chaos/chaosLib.mjs`](chaos/chaosLib.mjs) (the runner imports it) into your repo — say
+   `scripts/chaos/` — and commit both.
+2. **Configure.** Copy [`chaos/chaos.config.example.json`](chaos/chaos.config.example.json) to your
+   project root as `chaos.config.json`. Run the gate from the directory that holds it.
+
+   | key | what it is |
+   |---|---|
+   | `plantsDir` | the folder of `*.plants.mjs` files, relative to that directory; top level only. Use its own folder (`chaos/`): under `test/`, `node --test` would run plant files as tests |
+   | `expectedTotal` | the exact number of plants. The gate refuses to start when it drifts |
+   | `testCommand` | an argv array. Each plant's `tests` are **appended**, so it must run only the files it is given: `["npx", "vitest", "run"]`, `["node", "--test"]` |
+   | `summary` | `"vitest"`, `"node"` (node:test), or two regexes whose last match is read, e.g. for Jest (checked on 30.5.0): `{ "failed": "^Tests:.*?(\\d+) failed", "passed": "^Tests:.*?(\\d+) passed" }` |
+3. **Write plants**, one per guard, in the format of [`chaos/example.plants.mjs`](chaos/example.plants.mjs).
+4. **The gate**, before you call a feature done: `node scripts/chaos/chaos.mjs`
+5. **Pre-commit**, the half that never mutates or runs a test: set
+   `CHAOS_CHECK_CMD="node scripts/chaos/chaos.mjs --check"` in the
+   [Level 4 hook](../commit-gate/pre-commit.template). It pins the count and resolves every anchor, so
+   a plant that rotted fails the commit that rotted it. **Never put the full gate in a hook** — it
+   rewrites source.
 
 | verdict | means | do |
 |---|---|---|
-| `RED` | a test caught the break | nothing — this is the pass |
-| `STAYED-GREEN` | nothing covers this guard | write the missing test; never weaken the plant |
-| `PLANT-FAILED` / `NO-OP` | the anchor moved, or the plant changes nothing | fix the plant |
-| `INCONCLUSIVE` | non-zero exit, no failed test — usually a plant that broke the build | fix the plant |
+| `RED` | a non-zero exit, a failed test, and as many tests as the unplanted run | nothing — this is the pass |
+| `STAYED-GREEN` | a clean exit with no failed test: nothing covers this guard | write the missing test; never weaken the plant |
+| `INCONCLUSIVE` | anything else — the build broke, a test file stopped loading, a "failure" at exit 0, a timeout | fix the plant |
 
-It **refuses to start** when the plant count drifted from `expectedTotal`, a target file has
-uncommitted work, backups from a crashed run exist, or the unplanted tests aren't green — including
-when the summary parser matched nothing, which is how a misconfigured runner would otherwise score
-every plant.
+Every verdict prints the summary line it read and the failing tests' names.
 
-⚠️ **Known limit:** `node --test` counts a file with a *syntax error* as a failed test, so with the
-`node` summary a plant that breaks the parse reads `RED`. Keep plants syntactically valid.
+**It refuses to start, touching nothing,** when an option is unknown · the plant count drifted · an
+anchor does not occur exactly once, a test file is missing, or a target is untracked, a symlink or
+the wrong letter case · a target has uncommitted work · the lock `.git/chaos` exists (a live run, or
+a dead one — it holds the originals of whatever was planted) · the unplanted tests aren't green,
+including when the summary parser matched nothing. **Mid-run** it stops if a test run changes
+`git status` anywhere, and Ctrl-C, SIGTERM and SIGHUP stop the tests, restore, and exit. A name
+filter (`node chaos.mjs refund`) is a debugging aid and exits 2, never 0.
+
+⚠️ **Known limits.** node:test counts a test file that fails to *load* as one failed test: the
+test-total check turns that into `INCONCLUSIVE` for a file with two or more tests, but a file with
+exactly one reads `RED` (a test pins this). A flaky test can hand a plant a false `RED` — the report
+names the test that failed, so look. SIGKILL cannot be caught: the file stays planted and its
+original stays in `.git/chaos`, which makes the next run refuse until you put it back.
 
 ## Tool 2 — the read-only fan-out: [`workflows/measure-refute.js`](workflows/measure-refute.js)
 
 A Claude Code workflow: one agent **measures** each unit (reads it first-hand, quotes evidence), then
-one adversarial agent per **lens** tries to **refute** that measurement. Nothing writes.
+one adversarial agent per **lens** tries to **refute** that measurement. Agents are instructed to
+write nothing — the prompt is the only thing enforcing it.
 
 ```bash
-mkdir -p ~/.claude/workflows && ln -s "$PWD/harness/workflows/measure-refute.js" ~/.claude/workflows/
-# then, in any project:  Workflow({ name: 'measure-refute', args: { goal, units, lenses } })
+# from this repo's root — `-sfn` makes it safe to re-run
+mkdir -p ~/.claude/workflows && ln -sfn "$PWD/harness/workflows/measure-refute.js" ~/.claude/workflows/measure-refute.js
+test -e ~/.claude/workflows/measure-refute.js && echo installed   # a dangling link fails here
 ```
 
-The accounting is the point, and it is tested code rather than a prompt: a dead measurement is
-`UNMEASURED` and never vanishes from the result; a run with ANY dead agent returns
-`status: 'UNVERIFIED'` and `fatalCount: null` — never the `0` a clean run returns.
+Start a new Claude Code session (workflows are registered at session start), then in any project:
+
+```js
+Workflow({ name: 'measure-refute', args: {
+  goal:   'the payment module against docs/SPEC.md §4',
+  units:  [{ name: 'refunds', read: ['src/pay/refund.ts', 'docs/SPEC.md'], focus: 'partial refunds' }],
+  lenses: [{ key: 'spec',  ask: 'Does every rule in §4 have code that enforces it?' },
+           { key: 'tests', ask: 'Which of those rules does no test assert?' }],
+} })
+```
+
+The accounting is the point, and it is tested code rather than a prompt: a dead or throwing agent
+stays in the result by unit and lens as `UNMEASURED` / `UNVERIFIED`; only an exact `CLEAN`,
+`CORRECTED` or `FATAL` counts as live; a run with ANY dead agent returns `status: 'UNVERIFIED'` and
+`fatalCount: null` — never the `0` a clean run returns. Malformed args (units as plain strings, a lens
+with no `ask`) spawn no agent at all and say what is wrong.
 
 ---
 
@@ -76,15 +111,19 @@ The accounting is the point, and it is tested code rather than a prompt: a dead 
 6. **A probe whose parser matched nothing has not passed.** Print the matched summary line beside
    every verdict; an empty verdict is a harness bug.
 
-## Why these exist — measured on the long build they came from
+## Why these exist — measured
 
-- A citation gate reported **0 failures** over **4** hand-verified wrong citations. Closing its three
-  holes (above, rule 3) raised **82** failures on the same tree.
+- On the long build these came from, a citation gate reported **0 failures** over **4** hand-verified
+  wrong citations. Closing its three holes (rule 3) raised **82** failures on the same tree.
 - A fan-out's first real run lost **8 of 8** verifiers to a usage limit and still returned
   `fatalCount: 0`.
 - Adjudicating **68** agent findings: all **534** cited commands re-ran and matched — and two agents'
   fixes for the same lines were both wrong anyway.
-- The chaos runner here: disarming each of its **10** guards turns a test red. The workflow's first
-  test draft: **2 of 5** plants stayed green — both missing tests.
+- **This level, before it was published:** three adversarial reviewers raised **41** findings (some by more than
+  one reviewer), **11** rated major. Among them: a test that merely *logged* `# fail 1` scored `RED` at exit 0;
+  Ctrl-C was ignored mid-run; units passed as plain strings came back `VERIFIED` with `fatalCount: 0`.
+  Each was reproduced, pinned by a test that failed on the old code, and fixed — except flaky-test
+  detection, which is documented above instead.
 
-**Check it yourself:** `node --test harness/` — 24 tests, no dependencies.
+**Check it yourself:** `node --test 'harness/**/*.test.mjs'` — 43 tests. Then the harness's own
+plants, each disarming one of its guards: `cd harness && node chaos/chaos.mjs` — 33 plants, all RED.

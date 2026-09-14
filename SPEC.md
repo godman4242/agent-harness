@@ -208,8 +208,10 @@ because the product *is* low cognitive load, so "add everything" would betray it
   and the new level is a literal one. +`harness/` (Level 6, coding projects): a zero-dependency
   **chaos-plant runner** (plants as committed data, count-pinned, green-baseline, red only on a failed
   test, byte-identical restore, `--check` for pre-commit) and the **`measure-refute`** Claude Code
-  workflow (read-only measure → adversarial refute, fail-closed accounting). 24 tests; each of the
-  runner's 10 guards chaos-proofed. Install identifiers (the profile marker, `~/.claude/hooks/agent-work-ethic/`)
+  workflow (read-only measure → adversarial refute, fail-closed accounting). Three adversarial reviewers
+  raised 41 findings before publishing (11 major, e.g. a logged `# fail 1` scored RED at exit 0); each
+  was reproduced and pinned red-first. 43 tests on Node 22/24/26; 33 committed plants, each disarming
+  one of the harness's own guards, all RED. Install identifiers (the profile marker, `~/.claude/hooks/agent-work-ethic/`)
   deliberately kept, so re-running `install.sh` over an old install cannot double-install.
 
 ## 9. Sources

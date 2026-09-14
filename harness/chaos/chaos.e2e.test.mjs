@@ -13,6 +13,9 @@ const GUARD = 'export function clamp(x) {\n  if (x < 0) return 0\n  return x\n}\
 // Every test run appends to $CHAOS_E2E_MARK, so "nothing ran" is measured, not inferred from output.
 const MARK = "import { appendFileSync } from 'node:fs'\nif (process.env.CHAOS_E2E_MARK) appendFileSync(process.env.CHAOS_E2E_MARK, 'ran\\n')\n"
 const TESTS = `import { test } from 'node:test'\nimport assert from 'node:assert/strict'\nimport { clamp } from '../src/guard.mjs'\n${MARK}test('clamp floors at zero', () => assert.equal(clamp(-1), 0))\n`
+// Node 26 prints the spec reporter (`ℹ fail 1`, `✖ name`) to a pipe; Node 22 prints TAP (`# fail 1`,
+// `not ok 1 - name`). Both are read by the runner, so assertions accept both.
+const SUM = (key, n) => `(?:ℹ|#) ${key} ${n}`
 const plant = (over) => ({ name: 'clamp: drop the floor', file: 'src/guard.mjs', find: '  if (x < 0) return 0\n', replace: '', tests: ['test/guard.test.mjs'], note: 'authored: fixture', ...over })
 
 /** A committed fixture project; returns its path. `files` adds or overrides repo-relative files. */
@@ -59,8 +62,8 @@ test('a covered guard goes RED and an uncovered one is a MISSING TEST — the re
   const dir = scratch(t, { plants: [plant(), plant({ name: 'limit: drop the ceiling', find: '  if (x > 10) return 10\n' })] })
   const r = run(dir)
   assert.equal(r.code, 1)
-  assert.match(r.out, /\[RED\] clamp: drop the floor\n.*ℹ fail 1 · ℹ pass 0.*\n.*✖ clamp floors at zero/)
-  assert.match(r.out, /\[STAYED-GREEN\] limit: drop the ceiling\n.*ℹ fail 0 · ℹ pass 1/)
+  assert.match(r.out, new RegExp(`\\[RED\\] clamp: drop the floor\\n.*${SUM('fail', 1)} · ${SUM('pass', 0)}.*\\n.*caught by: (?:✖|not ok \\d+ -) clamp floors at zero`))
+  assert.match(r.out, new RegExp(`\\[STAYED-GREEN\\] limit: drop the ceiling\\n.*${SUM('fail', 0)} · ${SUM('pass', 1)}`))
   assert.match(r.out, /2\/2 files restored byte-identical; git status is what it was before the run/)
   assert.equal(readFileSync(join(dir, 'src/guard.mjs'), 'utf8'), GUARD)
   assert.ok(r.clean && !r.lockLeft)
@@ -186,7 +189,7 @@ test('a RED baseline refuses to start — it would hand every plant a free red',
   const dir = scratch(t, { plants: [plant()], files: { 'test/guard.test.mjs': TESTS.replace('clamp(-1), 0', 'clamp(-1), 99') } })
   const r = run(dir)
   assert.equal(r.code, 1)
-  assert.match(r.out, /baseline for 'test\/guard\.test\.mjs' is not green: exit 1 · ℹ fail 1 · ℹ pass 0/)
+  assert.match(r.out, new RegExp(`baseline for 'test/guard\\.test\\.mjs' is not green: exit 1 · ${SUM('fail', 1)} · ${SUM('pass', 0)}`))
   assert.ok(r.clean && !r.lockLeft)
 })
 
