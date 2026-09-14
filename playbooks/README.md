@@ -18,7 +18,8 @@ setup from an elite one. Each is one page and optional; adopt them one at a time
 | [`tool-triage.md`](tool-triage.md) | Tempted to add a tool / skill / library | Overlap? · the one novel nugget · standing cost — take the idea, skip the install |
 | [`proof-discipline.md`](proof-discipline.md) | Long builds where "looks right" ≠ "is right" | Binary gates + pasted evidence · red-first + chaos-proofs · pins/ratchets · refuter-verified audits · dev-seam verification |
 
-**Where these sit:** Level 5 in [`../SETUP-LEVELS.md`](../SETUP-LEVELS.md). They assume you already have
+**Where these sit:** Level 5 in [`../SETUP-LEVELS.md`](../SETUP-LEVELS.md). Level 6 ([`../harness/`](../harness/))
+turns `proof-discipline`'s manual moves into committed tools. They assume you already have
 Levels 1–2 (a profile + enforcement); memory (Level 3) and the commit gate (Level 4) make them sharper
 but aren't required.
 

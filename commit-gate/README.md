@@ -12,7 +12,7 @@ when it's broken — the gate is the evidence. *(Coding projects only; skip this
 ```bash
 # from your project root:
 mkdir -p .githooks
-cp /path/to/agent-work-ethic/commit-gate/pre-commit.template .githooks/pre-commit
+cp /path/to/agent-harness/commit-gate/pre-commit.template .githooks/pre-commit
 chmod +x .githooks/pre-commit
 git config core.hooksPath .githooks     # tell git to use this folder for hooks
 ```

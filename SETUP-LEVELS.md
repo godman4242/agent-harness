@@ -47,6 +47,16 @@ kickoffs, folder-local rules (nested `CLAUDE.md`), and a handoff routine so long
 context reset.
 **Do:** [`playbooks/README.md`](playbooks/README.md) — one-page habits; adopt one at a time.
 
+## Level 6 — The harness · +30 minutes *(coding projects)*
+**What:** make what nobody noticed *fail a gate*. Committed **chaos plants** prove every guard has a
+test that can fail, and a read-only **verification workflow** checks what the docs claim against the
+code — with accounting that can't mistake a crashed check for a clean one. (Skip if you're not
+writing code.)
+**Do:** [`harness/README.md`](harness/README.md) — copy one config, write one plant per guard, add
+`--check` to your commit gate.
+**You now get:** a guard with no test goes red instead of shipping, and "0 problems found" means the
+check actually ran.
+
 ---
 
 ## Fastest path (Levels 1–2 in one command)
@@ -55,11 +65,11 @@ context reset.
 ./install.sh profile/ready-made/adhd-friendly.md   # or start from an archetype
 ```
 Safe and idempotent — it backs up anything it changes and never clobbers your existing `CLAUDE.md` /
-`settings.json`. Then add Levels 3–5 per project from the pointers above.
+`settings.json`. Then add Levels 3–6 per project from the pointers above.
 
 ## What's shipped
-All five levels + the archetypes are live: `SETUP-LEVELS.md` (this file), `hooks/` (L2),
-[`memory/`](memory/) (L3), [`commit-gate/`](commit-gate/) (L4), [`playbooks/`](playbooks/) (L5),
+All six levels + the archetypes are live: `SETUP-LEVELS.md` (this file), `hooks/` (L2),
+[`memory/`](memory/) (L3), [`commit-gate/`](commit-gate/) (L4), [`playbooks/`](playbooks/) (L5), [`harness/`](harness/) (L6),
 [`install.sh`](install.sh), and the [`profile/ready-made/`](profile/ready-made/) archetypes
 (`adhd-friendly`, `beginner`, `senior-fast-shipper`).
 

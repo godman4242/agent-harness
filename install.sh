@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# agent-work-ethic installer  ·  sets up Levels 1–2 (profile + enforced hook)
+# agent-harness installer  ·  sets up Levels 1–2 (profile + enforced hook)
 # globally for Claude Code, so every project gets a disciplined agent by default.
 #
 #   ./install.sh                              # installs profile/reference.md
@@ -17,6 +17,9 @@ REPO="$(cd "$(dirname "$0")" && pwd)"
 PROFILE="${1:-profile/reference.md}"
 SRC_PROFILE="$REPO/$PROFILE"
 CLAUDE_DIR="$HOME/.claude"
+# The marker and the hooks folder keep the repo's FORMER name on purpose: installs made before the
+# rename carry them, and changing either would make a re-run append a second profile and wire a
+# second hook instead of recognising the existing install.
 MARKER="<!-- agent-work-ethic:profile -->"
 
 [ -f "$SRC_PROFILE" ] || { echo "❌ profile not found: $SRC_PROFILE"; exit 1; }

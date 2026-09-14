@@ -23,10 +23,10 @@ Copy your profile into the project root under the filename your tool reads:
 - **Cursor / Codex / Copilot** → `AGENTS.md`
 
 ```bash
-# from inside agent-work-ethic/, run this in your target project:
-cp "/path/to/agent-work-ethic/hooks/CLAUDE.md.template"  ./CLAUDE.md     # Claude Code
+# from inside agent-harness/, run this in your target project:
+cp "/path/to/agent-harness/hooks/CLAUDE.md.template"  ./CLAUDE.md     # Claude Code
 # or
-cp "/path/to/agent-work-ethic/hooks/AGENTS.md.template"  ./AGENTS.md     # other tools
+cp "/path/to/agent-harness/hooks/AGENTS.md.template"  ./AGENTS.md     # other tools
 ```
 
 Edit the `{slots}` in the copied file. Done — the agent reads it at the start of each session.
@@ -43,11 +43,11 @@ script the agent runs automatically), so they don't fade as the chat grows.
 
 ```bash
 # 1) Put your profile where Claude reads it for every project:
-cp "/path/to/agent-work-ethic/hooks/CLAUDE.md.template"  ~/.claude/CLAUDE.md   # (or append to an existing one)
+cp "/path/to/agent-harness/hooks/CLAUDE.md.template"  ~/.claude/CLAUDE.md   # (or append to an existing one)
 
 # 2) Install the enforcement hook:
 mkdir -p ~/.claude/hooks/agent-work-ethic
-cp "/path/to/agent-work-ethic/hooks/ship-bar.sh"  ~/.claude/hooks/agent-work-ethic/ship-bar.sh
+cp "/path/to/agent-harness/hooks/ship-bar.sh"  ~/.claude/hooks/agent-work-ethic/ship-bar.sh
 chmod +x ~/.claude/hooks/agent-work-ethic/ship-bar.sh
 ```
 

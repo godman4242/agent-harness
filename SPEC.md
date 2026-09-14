@@ -1,4 +1,4 @@
-# agent-work-ethic — v1 design spec
+# agent-harness (formerly agent-work-ethic) — v1 design spec
 
 > **One line:** A drop-in kit that gives any AI agent (Claude Code, Cursor, Codex) the work ethic of a
 > disciplined senior — for coding *or* general knowledge work — and lets each person *tune it to
@@ -90,7 +90,7 @@ pre-fill them as a convenient starting point (see `profile/ready-made/`).
 ## 4. v1 file structure (build this)
 
 ```
-agent-work-ethic/
+agent-harness/
 ├── README.md                 # pitch + 60-sec quickstart + plain-English UDL explainer + curb-cut framing
 ├── profile/
 │   ├── reference.md          # THE SEED: a complete, filled-in profile (generalized), all 7 dims under the 3 UDL principles
@@ -204,6 +204,13 @@ because the product *is* low cognitive load, so "add everything" would betray it
 - **v4.3 (2026-07):** +`decision-hygiene` playbook — for a consequential, hard-to-reverse choice:
   steelman the alternative → red-team your own pick → check ordering → show both. Pairs with
   `proof-discipline` (verify you did it right) and `planning`'s stop-rule (when to abandon it).
+- **v5 (2026-09):** renamed **`agent-harness`** — the levels were always "the harness around the agent",
+  and the new level is a literal one. +`harness/` (Level 6, coding projects): a zero-dependency
+  **chaos-plant runner** (plants as committed data, count-pinned, green-baseline, red only on a failed
+  test, byte-identical restore, `--check` for pre-commit) and the **`measure-refute`** Claude Code
+  workflow (read-only measure → adversarial refute, fail-closed accounting). 24 tests; each of the
+  runner's 10 guards chaos-proofed. Install identifiers (the profile marker, `~/.claude/hooks/agent-work-ethic/`)
+  deliberately kept, so re-running `install.sh` over an old install cannot double-install.
 
 ## 9. Sources
 

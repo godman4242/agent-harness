@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agent-work-ethic — standing work-ethic contract, re-injected on every turn.
+# agent-harness — standing work-ethic contract, re-injected on every turn.
 #
 # This is a Claude Code UserPromptSubmit hook: whatever it prints to stdout is added to the agent's
 # context for that turn, so the rules stay top-of-mind instead of fading as the conversation grows.

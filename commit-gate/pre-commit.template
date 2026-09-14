@@ -1,6 +1,6 @@
 #!/bin/sh
 # ─────────────────────────────────────────────────────────────────────────────
-# "done = green" commit gate  ·  agent-work-ethic Level 4
+# "done = green" commit gate  ·  agent-harness Level 4
 #
 # Blocks the commit unless your build / tests / lint all pass. This is what makes
 # "done" mean *verified* instead of *claimed* — the agent (or you) literally
@@ -9,7 +9,7 @@
 #
 # INSTALL (per project, ~30s):
 #   mkdir -p .githooks
-#   cp /path/to/agent-work-ethic/commit-gate/pre-commit.template .githooks/pre-commit
+#   cp /path/to/agent-harness/commit-gate/pre-commit.template .githooks/pre-commit
 #   chmod +x .githooks/pre-commit
 #   git config core.hooksPath .githooks
 # Then fill in the three commands below for your stack.

@@ -1,6 +1,7 @@
-# agent-work-ethic
+# agent-harness
 
-**Give any AI agent the work ethic of a disciplined senior — tuned to *you*.**
+**Give any AI agent the work ethic of a disciplined senior — tuned to *you* — and the gates that
+catch what it misses.** *(Formerly `agent-work-ethic`; the old URL redirects here.)*
 
 Drop this into any project and your agent (Claude Code, Cursor, Codex, Copilot) stops being an eager
 intern and starts working like a careful senior colleague: it leads with the answer, decides routine
@@ -42,8 +43,8 @@ Pick one:
 Then make it stick: [`INSTALL.md`](INSTALL.md) wires a hook (a small script the agent runs every turn)
 so the rules are *enforced*, not just suggested.
 
-**Want the full, top-tier setup?** Follow [`SETUP-LEVELS.md`](SETUP-LEVELS.md) — five optional levels
-(profile → enforced → memory → commit-gate → playbooks) you climb one at a time. It gets your *setup*
+**Want the full, top-tier setup?** Follow [`SETUP-LEVELS.md`](SETUP-LEVELS.md) — six optional levels
+(profile → enforced → memory → commit-gate → playbooks → harness) you climb one at a time. It gets your *setup*
 into the top few percent without drowning you on day one (and it's honest about what a repo can and
 can't hand you — elite scaffolding instantly; judgment still grows with use).
 
@@ -53,7 +54,7 @@ can't hand you — elite scaffolding instantly; judgment still grows with use).
 
 ```
 README.md                  ← you are here
-SETUP-LEVELS.md            ← the on-ramp: 5 optional levels to a top-tier setup
+SETUP-LEVELS.md            ← the on-ramp: 6 optional levels to a top-tier setup
 install.sh                 ← one command: sets up Levels 1–2 globally (safe + idempotent)
 SPEC.md                    ← the design / build contract
 profile/
@@ -66,6 +67,7 @@ memory/                    ← give the agent continuity across sessions (Level 
   MEMORY.md                ← the session-start index (starts empty)
   memory-file.template.md  ← copy to record one fact
 commit-gate/               ← "done = green": a pre-commit gate template (Level 4)
+harness/                   ← chaos plants + a read-only verification workflow, for code (Level 6)
 playbooks/                 ← process habits: planning · divergent-thinking · decision-hygiene · feature-workflow · kickoff · handoff · nested-context · crash-resilience · maintenance-rot · tool-triage · proof-discipline (Level 5)
 hooks/
   ship-bar.sh              ← re-injects your standing rules every turn (enforcement)
