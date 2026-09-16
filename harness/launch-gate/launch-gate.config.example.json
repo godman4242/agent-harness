@@ -1,0 +1,31 @@
+{
+  "name": "my-site",
+  "liveUrl": "https://example.com",
+  "dist": "dist",
+  "clientSources": ["src", "public", "index.html"],
+  "publicEnvPrefixes": ["VITE_", "NEXT_PUBLIC_", "PUBLIC_", "REACT_APP_", "EXPO_PUBLIC_"],
+  "supabaseMigrations": "supabase",
+  "ownHosts": ["example.com"],
+
+  "_thirdParties": "EVERY external host the shipped page can reach. An origin with no entry FAILS — that is the point: an undeclared third party is an undecided one. `basis` is why it is allowed, in your own words. Set personalData:true when the request itself hands that party user data (an IP address counts), and then `consent` must say how that is lawful.",
+  "thirdParties": [
+    { "host": "*.supabase.co", "basis": "the app's own backend", "personalData": true, "consent": "the user signs in to use it; covered by the privacy policy" },
+    { "host": "fonts.googleapis.com", "basis": "webfont stylesheet", "personalData": true, "consent": "TODO — self-host the fonts and delete this entry" }
+  ],
+
+  "_legal": "Checked by whether the WORDS ship in the bundle, because an SPA serves index.html for every path and a route table will happily lie to you.",
+  "legal": [
+    { "name": "Privacy policy", "markers": ["Privacy Policy"], "why": "you store personal data and load third parties", "severity": "fail" },
+    { "name": "Terms of use", "markers": ["Terms of Use", "Terms and Conditions"], "why": "you let people create accounts", "severity": "fail" },
+    { "name": "Refund policy", "markers": ["Refund"], "why": "only applicable once you take payments", "severity": "warn" }
+  ],
+
+  "checks": {
+    "secrets": true,
+    "rls": true,
+    "headers": true,
+    "thirdParties": true,
+    "legal": true,
+    "a11y": true
+  }
+}

@@ -93,6 +93,29 @@ with no `ask`) spawn no agent at all and say what is wrong.
 
 ---
 
+## Tool 3 — the launch gate: [`launch-gate/`](launch-gate/)
+
+For any project that ships a **public web surface with users**. Every popular "things to do before
+you launch" checklist is a legal and accessibility list — privacy policy, cookie banner, alt text,
+T&Cs. The three things that actually destroy a site built this way are on none of them: **a secret
+baked into the client bundle, a table with Row Level Security off, and a CSP that was never switched
+on.** This gate does both halves, security first.
+
+**Needs:** Node 18+ (uses global `fetch`). No dependencies.
+
+1. **Point at it or vendor it.** `node <path>/launch-gate/launch-gate.mjs`, or copy
+   `launch-gate.mjs` **and** `launchGateLib.mjs` into your repo.
+2. **Configure.** Copy [`launch-gate/launch-gate.config.example.json`](launch-gate/launch-gate.config.example.json)
+   to your project root as `launch-gate.config.json`. Run from the directory that holds it.
+3. **Run it before you deploy**, and after any change to auth, tables, env vars or third parties.
+   `--static` is the offline half; the full run fetches the live site.
+
+⛔ **Not a pre-commit hook** — the full run needs the network and the deployed site.
+
+It is fail-closed by construction: an unreadable input is a **failure**, never a skip, and the
+header line always prints what was actually inspected — so a run that covered nothing cannot look
+like a clean one. Full check list and rationale: [`launch-gate/README.md`](launch-gate/README.md).
+
 ## The rules this level adds
 
 1. **A script beats a swarm — then a swarm checks the script.** Whatever a loop can decide (does this
@@ -127,5 +150,5 @@ with no `ask`) spawn no agent at all and say what is wrong.
   Each was reproduced, pinned by a test that failed on the old code, and fixed — except flaky-test
   detection, which is documented above instead.
 
-**Check it yourself:** `node --test 'harness/**/*.test.mjs'` — 43 tests. Then the harness's own
+**Check it yourself:** `node --test 'harness/**/*.test.mjs'` — 82 tests. Then the harness's own
 plants, each disarming one of its guards: `cd harness && node chaos/chaos.mjs` — 33 plants, all RED.
