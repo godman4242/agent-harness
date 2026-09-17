@@ -151,3 +151,50 @@ test('a measure agent that THROWS leaves the unit UNMEASURED with every lens nam
   assert.deepEqual(a.verdicts.map((v) => [v.lens, v.verdict]), [['x', 'UNVERIFIED'], ['y', 'UNVERIFIED']])
   assert.match(result.integrity, /2\/3 units measured; 4\/6 live verdicts.*2 UNVERIFIED/)
 })
+
+test('a dead measurement keeps its REASON — the refute branch always did, this one used to discard it', async () => {
+  const { result } = await run(ARGS, (l) => {
+    if (l === 'measure:a') throw new Error('budget ceiling')
+    return l.startsWith('measure') ? measured(l) : { verdict: 'CLEAN', refutations: [], integrity: '' }
+  })
+  const a = result.units.find((u) => u.unit === 'a')
+  // The reason has to survive to the verdict an operator actually reads. Before this, every
+  // measure death read 'returned nothing or threw' — indistinguishable from an agent that
+  // came back empty, which is the dead-vs-found-nothing confusion this file exists to close.
+  for (const v of a.verdicts) assert.match(v.integrity, /budget ceiling/)
+})
+
+test('a dead measurement still returns NULL — a reason object must not read as a live measurement', async () => {
+  const { result, labels } = await run(ARGS, (l) => {
+    if (l === 'measure:a') throw new Error('budget ceiling')
+    return l.startsWith('measure') ? measured(l) : { verdict: 'CLEAN', refutations: [], integrity: '' }
+  })
+  const a = result.units.find((u) => u.unit === 'a')
+  assert.equal(a.status, 'UNMEASURED')
+  // If the catch returned an object instead of null it would be non-null, sail through the
+  // guard, and spawn refuters against garbage. No refute agent may exist for unit 'a'.
+  assert.equal(labels.filter((l) => l.startsWith('refute:a:')).length, 0)
+  assert.equal(result.fatalCount, null)
+})
+
+test('the planned agent count is announced BEFORE anything spawns', async () => {
+  const lines = []
+  const agent = async (_p, o) => { lines.push(`AGENT ${o.label}`); return measured(o.label) }
+  const parallel = async (ts) => Promise.all(ts.map((t) => Promise.resolve().then(t).catch(() => null)))
+  const pipeline = async (items, ...stages) => {
+    const out = []
+    for (const [i, item] of items.entries()) {
+      let v = item
+      try { for (const s of stages) v = await s(v, item, i) } catch { v = null }
+      out.push(v)
+    }
+    return out
+  }
+  await body(agent, parallel, pipeline, (m) => lines.push(`LOG ${m}`), () => {}, ARGS)
+  const plan = lines.findIndex((l) => l.startsWith('LOG planning'))
+  const firstAgent = lines.findIndex((l) => l.startsWith('AGENT'))
+  assert.ok(plan >= 0, 'no plan line was logged')
+  assert.ok(plan < firstAgent, 'the plan was announced after agents had already spawned')
+  // 3 units x (1 measure + 2 lenses) = 9. The number an operator needs before the spend.
+  assert.match(lines[plan], /3 units x \(1 measure \+ 2 lenses\) = 9 agent launches/)
+})

@@ -184,15 +184,33 @@ VERDICT, fail-closed: FATAL (a claim is wrong in a way that would build the wron
 CORRECTED (claims stand but need listed fixes) · CLEAN (you RAN real checks and broke nothing)
 · UNVERIFIED (you could not run the checks — NEVER return CLEAN in that case).`
 
+// Say how big this fan-out is BEFORE it starts. Not a refusal: a cap the caller can pass is
+// a cap the caller can raise, and on the one runaway this harness has on record — 28 agents,
+// 1.37M tokens, 0 verified — any plausible constant would have sat above it and waved it
+// through. The written rule ("a fan-out over a repo we do not already know gets <=6 agents
+// with explicit file lists") is stricter than a constant, and the operator is the breaker.
+// What the operator was missing is the number, before the spend.
+log(`planning ${UNITS.length} units x (1 measure + ${LENSES.length} lenses) = ${UNITS.length * (1 + LENSES.length)} agent launches`)
+
+// Why a measurement died, kept instead of discarded. The refute branch below already keeps
+// its error; this one used to throw the identical class of message away 11 lines earlier —
+// two copies of one rule, diverged, inside one file.
+const deaths = new Map()
+
 phase('Measure')
 const results = await pipeline(
   UNITS,
   // The runtime's agent() returns null when an agent dies and THROWS in other cases (a budget
   // ceiling); both are caught here so neither can drop a unit or a lens name.
-  (unit) => agent(measurePrompt(unit), { label: `measure:${unit.name}`, phase: 'Measure', schema: MEASURE_SCHEMA }).catch(() => null),
+  (unit) => agent(measurePrompt(unit), { label: `measure:${unit.name}`, phase: 'Measure', schema: MEASURE_SCHEMA }).catch((err) => {
+    // Record the reason, still return NULL. Returning an object here would be non-null and
+    // would sail straight through the guard below as a live measurement.
+    deaths.set(unit.name, err instanceof Error ? err.message : String(err))
+    return null
+  }),
   (measured, unit) => {
     if (typeof measured !== 'object' || measured === null) {
-      return { unit: unit.name, status: 'UNMEASURED', verdicts: LENSES.map((l) => unverified(l.key, 'the measure agent returned nothing or threw')) }
+      return { unit: unit.name, status: 'UNMEASURED', verdicts: LENSES.map((l) => unverified(l.key, `the measure agent died: ${deaths.get(unit.name) ?? 'returned nothing'}`)) }
     }
     return parallel(
       LENSES.map((lens) => async () => {
