@@ -161,6 +161,12 @@ REVOKE ALL PRIVILEGES ON TABLE public.a, "b" FROM "anon", authenticated CASCADE;
   assert.match(out[0].message, /public\.c/)
 })
 
+test('rls: a REVOKE made before the table is dropped and re-created no longer counts', () => {
+  // re-creating a table re-applies Supabase's default grants to anon and authenticated
+  const sql = SERVICE_ROLE_ONLY_SQL + 'drop table rate_limits;\ncreate table rate_limits (uid uuid, n int);\nalter table rate_limits enable row level security;'
+  assert.equal(rlsFindings(auditRls(sql)).length, 1)
+})
+
 test('rls: a REVOKE never excuses a table with RLS off', () => {
   const out = rlsFindings(auditRls(`create table t (id int);\nrevoke all on t from anon, authenticated;`))
   assert.equal(out.length, 1)
@@ -223,6 +229,10 @@ test("headers: 'unsafe-inline' warns only where it reaches scripts, not in style
   assert.equal(warnsInline("default-src 'self'; script-src 'self' 'unsafe-inline'"), true)
   // no script-src: scripts fall back to default-src
   assert.equal(warnsInline("default-src 'self' 'unsafe-inline'; style-src 'self'"), true)
+  // inline event handlers / elements have their own directives, and keywords are case-insensitive
+  assert.equal(warnsInline("default-src 'self'; script-src 'self'; script-src-attr 'unsafe-inline'"), true)
+  assert.equal(warnsInline("default-src 'self'; script-src 'self'; script-src-elem 'self' 'unsafe-inline'"), true)
+  assert.equal(warnsInline("default-src 'self'; script-src 'self' 'UNSAFE-INLINE'"), true)
 })
 
 test('headers: no CSP at all fails', () => {

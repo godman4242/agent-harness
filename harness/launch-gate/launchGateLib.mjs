@@ -124,15 +124,20 @@ export function auditRls(sql) {
     if (!tables.has(k)) tables.set(k, { table: k, rls: false, policies: 0 })
     return tables.get(k)
   }
-  for (const m of clean.matchAll(CREATE_TABLE_RE)) ensure(tableKey(m[1], m[2]))
+  const lastCreate = new Map() // a re-create re-applies Supabase's default grants, so a REVOKE must follow it
+  for (const m of clean.matchAll(CREATE_TABLE_RE)) {
+    ensure(tableKey(m[1], m[2]))
+    lastCreate.set(tableKey(m[1], m[2]), m.index)
+  }
   for (const m of clean.matchAll(ENABLE_RLS_RE)) ensure(tableKey(m[1], m[2])).rls = true
   for (const m of clean.matchAll(CREATE_POLICY_RE)) ensure(tableKey(m[1], m[2])).policies++
-  // Order-free on purpose: migrations arrive concatenated, so a GRANT anywhere re-opens the table.
+  // A GRANT anywhere re-opens the table (order-free, fail-closed); a REVOKE only counts after the last CREATE.
   const revoked = new Set()
   const granted = new Set()
   for (const m of clean.matchAll(REVOKE_ALL_RE)) {
     const roles = roleNames(m[2])
-    if (CLIENT_ROLES.every((r) => roles.includes(r))) for (const t of tableNames(m[1])) revoked.add(t)
+    if (!CLIENT_ROLES.every((r) => roles.includes(r))) continue
+    for (const t of tableNames(m[1])) if (m.index > (lastCreate.get(t) ?? -1)) revoked.add(t)
   }
   for (const m of clean.matchAll(GRANT_RE)) {
     if (!roleNames(m[2]).some((r) => r === 'public' || CLIENT_ROLES.includes(r))) continue
@@ -194,9 +199,12 @@ export function auditHeaders(headers) {
   }
   if (enforced) {
     const v = headers['content-security-policy']
-    // Only the directive that governs scripts counts: script-src, else default-src.
+    // Only directives that govern scripts count — elements and inline handlers each fall back to
+    // script-src, then default-src, as browsers do. Keywords are case-insensitive.
     const directive = (name) => v.split(';').map((d) => d.trim()).find((d) => d.toLowerCase().startsWith(`${name} `))
-    if (/'unsafe-inline'/.test(directive('script-src') ?? directive('default-src') ?? '')) {
+    const forScripts = ['script-src', 'script-src-elem', 'script-src-attr']
+      .map((n) => directive(n) ?? directive('script-src') ?? directive('default-src') ?? '')
+    if (forScripts.some((d) => /'unsafe-inline'/i.test(d))) {
       out.push({ check: 'headers', severity: SEVERITY.WARN, message: "CSP allows 'unsafe-inline' for scripts, which removes most of its XSS value.", evidence: v.slice(0, 160) })
     }
     if (/\bhttp:\/\/(localhost|127\.0\.0\.1)/.test(v)) {
