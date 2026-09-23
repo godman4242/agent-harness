@@ -85,17 +85,31 @@ export function findSecrets(text, source = 'input') {
 
 // ── G2: Row Level Security on every table ──────────────────────────────────
 // With a publishable/anon key in the bundle (which is correct and expected), RLS is the
-// ONLY thing between a stranger and the data. A table with RLS off, or RLS on with no
-// policy, is world-readable — the second is the trap, because it *looks* protected.
+// ONLY thing between a stranger and the data. A table with RLS off is world-readable. RLS on
+// with no policy denies every client, your own app included — broken, yet it *looks* protected —
+// UNLESS the table is service-role-only by design, which it must say out loud: REVOKE ALL from
+// both client roles, and no GRANT anywhere that hands a client role access back.
 
 const IDENT = String.raw`(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_$]*)`
 const QUALIFIED = String.raw`(?:(${IDENT})\s*\.\s*)?(${IDENT})`
 const CREATE_TABLE_RE = new RegExp(String.raw`create\s+table\s+(?:if\s+not\s+exists\s+)?${QUALIFIED}`, 'gi')
 const ENABLE_RLS_RE = new RegExp(String.raw`alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?${QUALIFIED}\s+enable\s+row\s+level\s+security`, 'gi')
 const CREATE_POLICY_RE = new RegExp(String.raw`create\s+policy\s+(?:${IDENT}|'[^']*')\s+on\s+${QUALIFIED}`, 'gi')
+// `revoke all` directly — so `revoke select …` and `revoke grant option for all …` never match.
+const REVOKE_ALL_RE = /revoke\s+all(?:\s+privileges)?\s+on\s+(?:table\s+)?([^;]+?)\s+from\s+([^;]+)/gi
+const GRANT_RE = /grant\s+[^;]*?\s+on\s+(?:table\s+)?([^;]+?)\s+to\s+([^;]+)/gi
+const ALL_TABLES_IN_SCHEMA_RE = new RegExp(String.raw`^all\s+tables\s+in\s+schema\s+(${IDENT})$`, 'i')
+const ONE_NAME_RE = new RegExp(String.raw`^${QUALIFIED}$`)
+// Supabase grants to anon and authenticated DIRECTLY, so revoking from PUBLIC alone leaves both
+// holding their privileges — while a grant TO public reaches both.
+const CLIENT_ROLES = ['anon', 'authenticated']
 
-const unquote = (s) => (s ? s.replace(/^"|"$/g, '') : s)
-const tableKey = (schema, name) => `${unquote(schema) || 'public'}.${unquote(name)}`
+// Postgres folds an unquoted name to lower case; a quoted one keeps its exact spelling.
+const fold = (s) => (!s ? s : /^".*"$/.test(s) ? s.slice(1, -1) : s.toLowerCase())
+const tableKey = (schema, name) => `${fold(schema) || 'public'}.${fold(name)}`
+const roleNames = (list) => list.split(',').map((r) => fold(r.trim().split(/\s+/)[0]))
+// Table names in a GRANT/REVOKE target list; anything else (a function, a schema) is skipped.
+const tableNames = (list) => list.split(',').map((n) => n.trim().match(ONE_NAME_RE)).filter(Boolean).map((m) => tableKey(m[1], m[2]))
 
 /** Strip SQL comments so a commented-out `enable row level security` cannot vouch for a table. */
 export function stripSqlComments(sql) {
@@ -113,6 +127,22 @@ export function auditRls(sql) {
   for (const m of clean.matchAll(CREATE_TABLE_RE)) ensure(tableKey(m[1], m[2]))
   for (const m of clean.matchAll(ENABLE_RLS_RE)) ensure(tableKey(m[1], m[2])).rls = true
   for (const m of clean.matchAll(CREATE_POLICY_RE)) ensure(tableKey(m[1], m[2])).policies++
+  // Order-free on purpose: migrations arrive concatenated, so a GRANT anywhere re-opens the table.
+  const revoked = new Set()
+  const granted = new Set()
+  for (const m of clean.matchAll(REVOKE_ALL_RE)) {
+    const roles = roleNames(m[2])
+    if (CLIENT_ROLES.every((r) => roles.includes(r))) for (const t of tableNames(m[1])) revoked.add(t)
+  }
+  for (const m of clean.matchAll(GRANT_RE)) {
+    if (!roleNames(m[2]).some((r) => r === 'public' || CLIENT_ROLES.includes(r))) continue
+    const schema = m[1].trim().match(ALL_TABLES_IN_SCHEMA_RE)
+    if (schema) granted.add(`${fold(schema[1])}.*`)
+    for (const t of tableNames(m[1])) granted.add(t)
+  }
+  for (const r of tables.values()) {
+    r.serviceRoleOnly = revoked.has(r.table) && !granted.has(r.table) && !granted.has(`${r.table.split('.')[0]}.*`)
+  }
   return [...tables.values()].sort((a, b) => a.table.localeCompare(b.table))
 }
 
@@ -121,8 +151,8 @@ export function rlsFindings(rows) {
   for (const r of rows) {
     if (!r.rls) {
       out.push({ check: 'rls', severity: SEVERITY.FAIL, message: `table ${r.table}: Row Level Security is NOT enabled — anyone holding the public key can read and write it.`, evidence: 'no `alter table … enable row level security` found in migrations' })
-    } else if (r.policies === 0) {
-      out.push({ check: 'rls', severity: SEVERITY.FAIL, message: `table ${r.table}: RLS enabled but ZERO policies — this denies your own app too, and reads as protected when it is merely broken.`, evidence: 'no `create policy … on` found for this table' })
+    } else if (r.policies === 0 && !r.serviceRoleOnly) {
+      out.push({ check: 'rls', severity: SEVERITY.FAIL, message: `table ${r.table}: RLS enabled but ZERO policies — this denies your own app too, and reads as protected when it is merely broken. If it is service-role-only by design, say so: REVOKE ALL ON TABLE ${r.table} FROM anon, authenticated.`, evidence: 'no `create policy … on` found for this table, and no REVOKE ALL from both client roles without a GRANT that re-opens it' })
     }
   }
   return out

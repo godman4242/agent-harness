@@ -109,6 +109,64 @@ test('rls: one good table does not vouch for a bad sibling', () => {
   assert.match(out[0].message, /user_cards/)
 })
 
+// HAND-BUILT: a service-role-only table (a server-side rate-limit counter). RLS on, no policy,
+// and every client privilege revoked — the REVOKE is what says "no client, ever" out loud.
+const SERVICE_ROLE_ONLY_SQL = `
+create table if not exists rate_limits (uid uuid, n int);
+alter table rate_limits enable row level security;
+revoke all on table rate_limits from anon, authenticated;
+`
+const withoutRevoke = (sql) => sql.replace(/^revoke.*$/m, '')
+
+test('rls: zero policies + REVOKE ALL from both client roles = service-role-only by design, passes', () => {
+  assert.deepEqual(rlsFindings(auditRls(SERVICE_ROLE_ONLY_SQL)), [])
+})
+
+test('rls: the same table goes red again the moment the REVOKE is removed', () => {
+  const out = rlsFindings(auditRls(withoutRevoke(SERVICE_ROLE_ONLY_SQL)))
+  assert.equal(out.length, 1)
+  assert.match(out[0].message, /ZERO policies.*REVOKE ALL ON TABLE public\.rate_limits FROM anon, authenticated/)
+})
+
+test('rls: a REVOKE that misses a client role, or only some privileges, does not count', () => {
+  for (const revoke of [
+    'revoke all on table rate_limits from anon;',
+    'revoke all on table rate_limits from public;',
+    'revoke select on table rate_limits from anon, authenticated;',
+    'revoke grant option for all on table rate_limits from anon, authenticated;',
+    '-- revoke all on table rate_limits from anon, authenticated;',
+  ]) {
+    const out = rlsFindings(auditRls(withoutRevoke(SERVICE_ROLE_ONLY_SQL) + revoke))
+    assert.equal(out.length, 1, revoke)
+  }
+})
+
+test('rls: a GRANT to a client role anywhere re-opens the table, whatever the file order', () => {
+  for (const grant of [
+    'grant select on public.rate_limits to authenticated;',
+    'grant all on table "rate_limits" to public;',
+    'grant all on all tables in schema public to anon;',
+    'GRANT SELECT ON Rate_Limits TO Anon;', // unquoted names fold to lower case in Postgres
+  ]) {
+    assert.equal(rlsFindings(auditRls(grant + SERVICE_ROLE_ONLY_SQL)).length, 1, grant)
+  }
+})
+
+test('rls: one REVOKE covers every table it lists, and vouches for no other', () => {
+  const sql = `create table a (id int); create table b (id int); create table c (id int);
+alter table a enable row level security; alter table b enable row level security; alter table c enable row level security;
+REVOKE ALL PRIVILEGES ON TABLE public.a, "b" FROM "anon", authenticated CASCADE;`
+  const out = rlsFindings(auditRls(sql))
+  assert.equal(out.length, 1)
+  assert.match(out[0].message, /public\.c/)
+})
+
+test('rls: a REVOKE never excuses a table with RLS off', () => {
+  const out = rlsFindings(auditRls(`create table t (id int);\nrevoke all on t from anon, authenticated;`))
+  assert.equal(out.length, 1)
+  assert.match(out[0].message, /NOT enabled/)
+})
+
 test('stripSqlComments removes both comment forms', () => {
   assert.equal(stripSqlComments('a -- x\nb /* y */ c').replace(/\s+/g, ' ').trim(), 'a b c')
 })
