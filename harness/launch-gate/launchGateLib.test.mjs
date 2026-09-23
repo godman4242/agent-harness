@@ -213,6 +213,18 @@ test('headers: localhost left in a live CSP warns but does not fail', () => {
   assert.ok(out.some((f) => f.severity === SEVERITY.WARN && /localhost/.test(f.message)))
 })
 
+test("headers: 'unsafe-inline' warns only where it reaches scripts, not in style-src", () => {
+  const warnsInline = (csp) => {
+    const h = { ...LIVE_HEADERS, 'permissions-policy': 'camera=()', 'content-security-policy': csp }
+    delete h['content-security-policy-report-only']
+    return auditHeaders(h).some((f) => f.severity === SEVERITY.WARN && /unsafe-inline/.test(f.message))
+  }
+  assert.equal(warnsInline("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"), false)
+  assert.equal(warnsInline("default-src 'self'; script-src 'self' 'unsafe-inline'"), true)
+  // no script-src: scripts fall back to default-src
+  assert.equal(warnsInline("default-src 'self' 'unsafe-inline'; style-src 'self'"), true)
+})
+
 test('headers: no CSP at all fails', () => {
   const h = { ...LIVE_HEADERS, 'permissions-policy': 'camera=()' }
   delete h['content-security-policy-report-only']

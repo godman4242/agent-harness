@@ -194,11 +194,13 @@ export function auditHeaders(headers) {
   }
   if (enforced) {
     const v = headers['content-security-policy']
-    if (/'unsafe-inline'/.test(v) && /script-src/.test(v)) {
+    // Only the directive that governs scripts counts: script-src, else default-src.
+    const directive = (name) => v.split(';').map((d) => d.trim()).find((d) => d.toLowerCase().startsWith(`${name} `))
+    if (/'unsafe-inline'/.test(directive('script-src') ?? directive('default-src') ?? '')) {
       out.push({ check: 'headers', severity: SEVERITY.WARN, message: "CSP allows 'unsafe-inline' for scripts, which removes most of its XSS value.", evidence: v.slice(0, 160) })
     }
     if (/\bhttp:\/\/(localhost|127\.0\.0\.1)/.test(v)) {
-      out.push({ check: 'headers', severity: SEVERITY.WARN, message: 'CSP on the live site still allows localhost origins — dev config leaked into production.', evidence: v.match(/\bhttp:\/\/(?:localhost|127\.0\.0\.1)[^\s;]*/g).join(' ') })
+      out.push({ check: 'headers', severity: SEVERITY.WARN, message: 'CSP on the live site allows localhost origins — dev config leaked into production, unless a feature deliberately talks to a tool on the visitor’s own machine (e.g. their own local AI model). Confirm which.', evidence: v.match(/\bhttp:\/\/(?:localhost|127\.0\.0\.1)[^\s;]*/g).join(' ') })
     }
   }
   return out
