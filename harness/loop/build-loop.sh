@@ -25,8 +25,8 @@
 #                  first line says why. Never removed automatically.
 #   CUTOFF         change the stop time of a RUNNING loop: `echo 202610011800 > docs/loop/CUTOFF`
 #                  (local YYYYMMDDHHMM). Anything else in the file stops the loop (fail closed).
-#   CYCLE_RUNNING  exists while a cycle works. Before editing the repo: touch PAUSE, wait for it
-#                  to disappear.
+#   CYCLE_RUNNING  exists while a cycle (or its post-ship check) works. Before editing the repo:
+#                  touch PAUSE, wait for it to disappear.
 #   LOOP.pid       the running loop's pid. A second loop in the same repo refuses to start.
 #
 # ── Env overrides ──────────────────────────────────────────────────────────────────────────────
@@ -179,21 +179,23 @@ while true; do
   wait "$cycle_pid"; status=$?
   kill_tree "$watchdog_pid"; wait "$watchdog_pid" 2>/dev/null
   cycle_pid="" watchdog_pid=""
-  rm -f "$L/CYCLE_RUNNING"
   declare -F loop_after_cycle >/dev/null && loop_after_cycle
   head_after="$(git rev-parse HEAD 2>/dev/null || echo none)"
+  red=0
   if [ "$status" -eq 0 ] && [ "$head_before" != "$head_after" ]; then
     idle=0; cur_sleep="$SLEEP"
     echo "──── cycle #$n SHIPPED $head_after (exit $status) @ $(lt '+%H:%M') ────"
     if declare -F loop_verify_ship >/dev/null; then
-      if loop_verify_ship "$head_after"; then echo "──── ✓ post-ship check green for $head_after ────"
-      else stop_loop "post-ship check RED for $head_after"; continue; fi
+      if loop_verify_ship "$head_after"; then echo "──── ✓ post-ship check green for $head_after ────"; else red=1; fi
     fi
-    nap "$cur_sleep"
   else
     idle=$((idle + 1))
     echo "──── cycle #$n no-op/err (exit $status, $idle in a row) @ $(lt '+%H:%M'); backing off ${cur_sleep}s ────"
-    nap "$cur_sleep"
-    cur_sleep=$((cur_sleep * 2)); [ "$cur_sleep" -gt "$MAX_SLEEP" ] && cur_sleep="$MAX_SLEEP"
   fi
+  # Only now is it safe to edit: a post-ship check may rewrite files (a chaos run plants and restores).
+  rm -f "$L/CYCLE_RUNNING"
+  [ "$red" = 1 ] && { stop_loop "post-ship check RED for $head_after"; continue; }
+  nap "$cur_sleep"
+  # An idle/errored cycle grows the NEXT breather (geometric, capped); a ship keeps it at base.
+  if [ "$idle" -gt 0 ]; then cur_sleep=$((cur_sleep * 2)); [ "$cur_sleep" -gt "$MAX_SLEEP" ] && cur_sleep="$MAX_SLEEP"; fi
 done

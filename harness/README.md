@@ -144,7 +144,7 @@ and nothing more is built until a human looks.
 Switches, all files in `docs/loop/`: `PAUSE` (soft), `STOP` (hard; the engine writes it on a red
 check), `CUTOFF` (move a running loop's stop time), `CYCLE_RUNNING` (wait for it to go before you
 edit). The engine's header documents every override. After editing the engine, run
-[`loop/test-build-loop.sh`](loop/test-build-loop.sh): 14 cases in throwaway repos, no model calls.
+[`loop/test-build-loop.sh`](loop/test-build-loop.sh): 15 cases in throwaway repos, no model calls.
 
 ## Tool 5 — the instruction-path gate: [`instruction-paths/`](instruction-paths/)
 

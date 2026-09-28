@@ -44,6 +44,11 @@ mkrepo green yes; FAKE_MODE=ship run
 grep -q 'SHIPPED' "$PWD.out" && grep -q 'post-ship check green' "$PWD.out" && grep -q 'MAX_CYCLES=1 reached' "$PWD.out" && [ ! -f docs/loop/STOP ] && [ ! -f docs/loop/LOOP.pid ] && [ ! -f docs/loop/CYCLE_RUNNING ] \
   && ok "T2 ship → green check → clean exit, lock + marker removed" || bad "T2 $(tail -5 "$PWD.out")"
 
+# T2b the CYCLE_RUNNING marker stays up through the post-ship check (it can rewrite files, e.g. chaos)
+mkrepo none yes; sed -i '' 's|^source |loop_verify_ship() { [ -f docs/loop/CYCLE_RUNNING ] \&\& echo marker-during-verify; }\nsource |' scripts/build-loop.sh; git commit -qam v
+FAKE_MODE=ship run
+grep -q 'marker-during-verify' "$PWD.out" && [ ! -f docs/loop/CYCLE_RUNNING ] && ok "T2b CYCLE_RUNNING held through the post-ship check, then removed" || bad "T2b $(tail -4 "$PWD.out")"
+
 # T3 ship + red check → STOP written with the reason
 mkrepo red yes; FAKE_MODE=ship run
 grep -q 'post-ship check RED' docs/loop/STOP 2>/dev/null && [ -z "$(git status --porcelain)" ] && ok "T3 red check → STOP file says why; tree clean" || bad "T3 $(tail -5 "$PWD.out")"
