@@ -6,7 +6,7 @@ quietly lie. (Skip it if you're not writing code.)
 
 It builds on [`playbooks/proof-discipline.md`](../playbooks/proof-discipline.md) — red-first tests,
 chaos-proofing, pins, refuter-verified audits. Read that first; this level turns its manual moves
-into two committed tools and adds the rules they earned.
+into committed tools and adds the rules they earned.
 
 ---
 
@@ -145,6 +145,27 @@ Switches, all files in `docs/loop/`: `PAUSE` (soft), `STOP` (hard; the engine wr
 check), `CUTOFF` (move a running loop's stop time), `CYCLE_RUNNING` (wait for it to go before you
 edit). The engine's header documents every override. After editing the engine, run
 [`loop/test-build-loop.sh`](loop/test-build-loop.sh): 14 cases in throwaway repos, no model calls.
+
+## Tool 5 — the instruction-path gate: [`instruction-paths/`](instruction-paths/)
+
+Prose is not compiled. A rule file that says "the contract loads from `.claude/ship-bar.md`" keeps
+saying it after that file is deleted, and an agent reads it as fact. This gate fails the commit when
+any backticked repo path in your **standing** rule files (CLAUDE.md and friends) doesn't resolve.
+A path resolves from the repo root or from the rule file's own folder.
+
+**Needs:** Node 20+, git. No dependencies.
+
+1. **Vendor it:** copy [`instruction-paths/instruction-paths.mjs`](instruction-paths/instruction-paths.mjs)
+   into your repo (say `scripts/`), so CI can run it too.
+2. **Configure:** [`instruction-paths.config.example.json`](instruction-paths/instruction-paths.config.example.json)
+   → `instruction-paths.config.json` at the root. `files` = the standing rule files only; `roots` =
+   your top-level folders, so an extensionless `scripts/gate` still counts as a path.
+3. **Run it on EVERY commit, docs-only ones included:** a markdown-only commit is exactly where prose
+   drift gets in, so if your hook skips build/test/lint for docs, keep this step (~0.1 s).
+
+Scope is the design: it deliberately skips the session handoff file (measured: 4% precision there),
+bare filenames, `~/` paths and URLs, and has **no exemption list**, so a red is always real.
+Gitignored paths are skipped and counted; if git can't answer, it fails closed.
 
 ## The rules this level adds
 

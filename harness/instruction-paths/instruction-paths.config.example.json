@@ -1,0 +1,4 @@
+{
+  "files": ["CLAUDE.md", "src/CLAUDE.md"],
+  "roots": ["src", "tests", "scripts", "docs"]
+}
