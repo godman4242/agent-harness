@@ -26,4 +26,9 @@ checks your work after you ship. If nothing clears the GOAL bar, make NO commit,
 
 # DEADMAN=1   # set if interactive sessions hold docs/loop/PAUSE and the loop should take over when one dies
 
+# A night of cycles following an unfilled "<build>" placeholder is a wasted night: refuse.
+if grep -q '<build>' "$(dirname "$0")/../docs/loop/CYCLE.md" 2>/dev/null; then
+  echo "build-loop: docs/loop/CYCLE.md still has its <…> placeholders; fill them in first" >&2; exit 1
+fi
+
 source "${LOOP_ENGINE:-$HOME/agent-harness/harness/loop/build-loop.sh}"   # where you cloned agent-harness
