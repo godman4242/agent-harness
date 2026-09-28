@@ -11,6 +11,8 @@ cat > "$S/fakeclaude.sh" <<'FAKE'
 case "${FAKE_MODE:-noop}" in
   ship) echo "$RANDOM" >> shipped.txt && git add shipped.txt && git commit -qm "fake ship" && echo "fake: shipped" ;;
   hang) echo "fake: hanging"; sleep 1000 ;;
+  dirty) echo "$RANDOM" >> half.txt && echo edit >> docs/loop/GOAL.md && echo "fake: left dirt" ;;
+  hangdirty) echo wip > half.txt; echo "fake: hanging dirty"; sleep 1000 ;;
   fail) echo "fake: failing"; exit 1 ;;
   *)    echo "fake: no gap above bar" ;;
 esac
@@ -80,6 +82,16 @@ took=$(( $(date +%s) - t0 )); ! kill -0 $lp 2>/dev/null && [ ! -f docs/loop/LOOP
 # T7 watchdog kills a hung cycle, no orphans
 mkrepo none yes; FAKE_MODE=hang CYCLE_TIMEOUT=3 run
 grep -q 'passed 3s — killed' "$PWD.out" && grep -q 'no-op/err' "$PWD.out" && ! pgrep -f 'sleep 1000' >/dev/null && ok "T7 watchdog killed hung cycle, no orphans" || { bad "T7 $(tail -4 "$PWD.out")"; pkill -f 'sleep 1000'; }
+
+# T11 a cycle that leaves uncommitted work → stashed, and the NEXT cycle still runs (was: PAUSE, and the
+# dead-man re-paused on the same dirt every 2 h — one unshipped cycle idled the rest of the night)
+mkrepo none yes; FAKE_MODE=dirty MAX_CYCLES=2 run
+[ "$(grep -c 'fake: left dirt' "$PWD.out")" = 2 ] && [ ! -f docs/loop/PAUSE ] && [ -z "$(git status --porcelain)" ] && [ "$(git stash list | wc -l | tr -d ' ')" = 2 ] \
+  && ok "T11 unshipped leftovers stashed, next cycle still runs" || bad "T11 $(tail -4 "$PWD.out")"
+# T11b the same after the watchdog kills a cycle mid-work
+mkrepo none yes; FAKE_MODE=hangdirty CYCLE_TIMEOUT=3 run
+grep -q 'passed 3s — killed' "$PWD.out" && [ -z "$(git status --porcelain)" ] && git stash list | grep -q 'build-loop: cycle #1' \
+  && ok "T11b a killed cycle's leftovers stashed" || { bad "T11b $(tail -4 "$PWD.out")"; pkill -f 'sleep 1000'; }
 
 # T9 dead-man: stale PAUSE + quiet tree → takeover and a cycle runs
 mkrepo none yes; touch -t 202601010000 docs/loop/PAUSE; find . -path ./.git -prune -o -type f -exec touch -t 202601010000 {} +

@@ -27,8 +27,9 @@ can sit on top of a screen nobody can use.
    - tiny (copy, styling, docs): your own hostile pass over `git diff`;
    - normal: ONE fresh-context reviewer subagent on `git diff` ("find a real bug in this diff;
      quote the line and the input that breaks it"). Fix what it proves;
-   - **high-risk** (<data migrations, auth, security, anything hard to undo>): **do not ship.**
-     Write the plan and the evidence into GOAL.md for an attended session, and end the cycle.
+   - **high-risk** (<data migrations, auth, security, anything hard to undo>): **do not ship the
+     change.** Commit ONLY GOAL.md, carrying the plan and the evidence for an attended session, and
+     end the cycle. The loop stashes whatever you leave uncommitted.
 9. **Ship ONE commit.** The handoff doc gets ≤3 lines in the same commit. The message says what the
    user will see, plus the evidence.
 10. **Exit.** The shell runs the post-ship check. If it goes red, the loop stops until a human looks.

@@ -9,7 +9,8 @@
 # cycle can't take the run down. It does ONE unit of work and exits. This shell does everything
 # a script can decide:
 #   time box · per-cycle watchdog · pause switches · single-instance lock · dirty-tree refusal ·
-#   idle backoff · the project's own check after every ship (red → STOP, fail closed) · a log.
+#   a cycle's uncommitted leftovers stashed · idle backoff · the project's own check after every
+#   ship (red → STOP, fail closed) · a log.
 #
 # ── Project file: set what applies, then source this ──────────────────────────────────────────
 #   CYCLE_PROMPT='…'             REQUIRED. What one cycle does; point it at the project's cycle doc.
@@ -181,6 +182,13 @@ while true; do
   cycle_pid="" watchdog_pid=""
   declare -F loop_after_cycle >/dev/null && loop_after_cycle
   head_after="$(git rev-parse HEAD 2>/dev/null || echo none)"
+  # The tree was clean when this cycle started, so anything uncommitted now is the cycle's own: a
+  # watchdog kill, a red commit gate, a "don't ship" call. Left there, the next cycle reads it as a
+  # human's edit and PAUSEs, and the dead-man re-pauses on the same dirt, so one unshipped cycle
+  # would idle the rest of the run. Stash it: recoverable, nothing deleted, the log names it.
+  if [ -n "$(git status --porcelain)" ] && git stash push -u -q -m "build-loop: cycle #$n left this uncommitted @ $(lt '+%F %H:%M')"; then
+    echo "──── cycle #$n left uncommitted work — stashed as $(git stash list -1 --format=%gd) (\`git stash show -p\` reads it) ────"
+  fi
   red=0
   if [ "$status" -eq 0 ] && [ "$head_before" != "$head_after" ]; then
     idle=0; cur_sleep="$SLEEP"
