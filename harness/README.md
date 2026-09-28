@@ -116,6 +116,36 @@ It is fail-closed by construction: an unreadable input is a **failure**, never a
 header line always prints what was actually inspected — so a run that covered nothing cannot look
 like a clean one. Full check list and rationale: [`launch-gate/README.md`](launch-gate/README.md).
 
+## Tool 4 — the build loop: [`loop/`](loop/)
+
+For running an agent **unattended**, overnight or for hours, on a repo that already has a commit
+gate (Level 4). Each cycle is a **fresh** headless `claude -p` process that does one unit of work
+and exits: clean context, flat cost, and a crashed cycle can't take the run down. The shell does
+everything a script can decide: a time box, a watchdog that kills a hung cycle and all it spawned,
+a lock (one loop per repo), a dirty-tree refusal (someone's edits are never swept into a cycle's
+commit), idle backoff, and **your own check after every ship**. A red check writes `docs/loop/STOP`,
+and nothing more is built until a human looks.
+
+**Needs:** macOS (BSD `date` / `stat`), bash, the Claude Code CLI, a Level 4 commit gate.
+
+1. **Point at the engine.** Copy [`loop/build-loop.project.sh`](loop/build-loop.project.sh) into your
+   repo as `scripts/build-loop.sh`. Set `CYCLE_PROMPT`, and optionally `loop_verify_ship` (a deploy
+   status, a live smoke test, a chaos run). It `source`s [`loop/build-loop.sh`](loop/build-loop.sh),
+   so one engine serves every project and no copy drifts.
+2. **Write the routine** a cycle follows: [`loop/CYCLE.template.md`](loop/CYCLE.template.md) →
+   `docs/loop/CYCLE.md`. It's a senior engineer's cycle: re-verify at HEAD, red first, smallest fix,
+   gate, **look** at what renders, chaos what you touched, review scaled to risk, one commit.
+   **High-risk work never ships unattended.** Add a `docs/loop/GOAL.md` saying what matters.
+3. **Gitignore the switches:** `docs/loop/*` then `!docs/loop/*.md`. The engine refuses to start
+   without them.
+4. **Dry run, then start:** `CLAUDE_BIN=true MAX_CYCLES=1 SLEEP=1 bash scripts/build-loop.sh`, then
+   `caffeinate -dimsu bash scripts/build-loop.sh` (it stops by itself at the next 08:00).
+
+Switches, all files in `docs/loop/`: `PAUSE` (soft), `STOP` (hard; the engine writes it on a red
+check), `CUTOFF` (move a running loop's stop time), `CYCLE_RUNNING` (wait for it to go before you
+edit). The engine's header documents every override. After editing the engine, run
+[`loop/test-build-loop.sh`](loop/test-build-loop.sh): 14 cases in throwaway repos, no model calls.
+
 ## The rules this level adds
 
 1. **A script beats a swarm — then a swarm checks the script.** Whatever a loop can decide (does this

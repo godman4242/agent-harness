@@ -67,7 +67,7 @@ memory/                    ← give the agent continuity across sessions (Level 
   MEMORY.md                ← the session-start index (starts empty)
   memory-file.template.md  ← copy to record one fact
 commit-gate/               ← "done = green": a pre-commit gate template (Level 4)
-harness/                   ← chaos plants + a read-only verification workflow, for code (Level 6)
+harness/                   ← chaos plants, a read-only verification workflow, a launch gate and an unattended build loop, for code (Level 6)
 playbooks/                 ← process habits: planning · divergent-thinking · decision-hygiene · feature-workflow · kickoff · handoff · nested-context · crash-resilience · maintenance-rot · tool-triage · proof-discipline (Level 5)
 hooks/
   ship-bar.sh              ← re-injects your standing rules every turn (enforcement)
