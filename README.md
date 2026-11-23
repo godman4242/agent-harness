@@ -66,6 +66,8 @@ memory/                    ← give the agent continuity across sessions (Level 
   README.md                ← how the file-based memory works + the one-paste wire-in
   MEMORY.md                ← the session-start index (starts empty)
   memory-file.template.md  ← copy to record one fact
+docs/
+  claude-memory-cheatsheet.md ← Claude Code memory commands: @-imports, where CLAUDE.md/rules live, /context all · /memory · /init · /doctor prompt-audit
 commit-gate/               ← "done = green": a pre-commit gate template (Level 4)
 harness/                   ← chaos plants, a read-only fan-out, a launch gate, a build loop and a prose-path gate, for code (Level 6)
 playbooks/                 ← process habits: planning · divergent-thinking · decision-hygiene · feature-workflow · kickoff · handoff · nested-context · crash-resilience · maintenance-rot · tool-triage · proof-discipline (Level 5)
